@@ -83,7 +83,7 @@ describe("GLD — Étape 1 : ERC-20 upgradeable", () => {
     it("un non-owner ne peut pas minter", async () => {
       await expect(
         gld.connect(alice).mint(bob.address, ONE_GRAM)
-      ).to.be.revertedWithCustomError(gld, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWithCustomError(gld, "UnauthorizedMinter");
     });
 
     it("ne peut pas minter vers address(0)", async () => {
@@ -122,7 +122,7 @@ describe("GLD — Étape 1 : ERC-20 upgradeable", () => {
     it("un non-owner ne peut pas brûler", async () => {
       await expect(
         gld.connect(alice).burn(alice.address, ONE_GRAM)
-      ).to.be.revertedWithCustomError(gld, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWithCustomError(gld, "UnauthorizedMinter");
     });
 
     it("ne peut pas brûler plus que le solde", async () => {
