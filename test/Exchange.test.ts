@@ -75,6 +75,7 @@ describe("Exchange — Étape 4 : achat et vente GLD/USDC", () => {
 
     // 5. Approuver Exchange comme minter sur GLD
     await gld.connect(owner).setMinter(await exchangeProxy.getAddress());
+    await treasury.connect(owner).setOperator(await exchangeProxy.getAddress());
 
     // 6. Approuver Exchange comme opérateur sur Treasury
     //    (Exchange doit pouvoir appeler treasury.withdraw)

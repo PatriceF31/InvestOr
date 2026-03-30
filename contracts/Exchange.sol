@@ -31,6 +31,7 @@ interface IGLD {
 interface ITreasury {
     function deposit(uint256 amount) external;
     function withdraw(uint256 amount) external;
+    function operatorWithdraw(address to, uint256 amount) external;
     function usdc() external view returns (address);
 }
 
@@ -211,11 +212,8 @@ contract Exchange is
         // 1. Burn GLD de l'utilisateur
         gld.burn(msg.sender, gldAmount);
 
-        // 2. Retrait USDC depuis Treasury → Exchange
-        treasury.withdraw(usdcAmount);
-
-        // 3. Transfert USDC Exchange → utilisateur
-        usdc.safeTransfer(msg.sender, usdcAmount);
+        // 2. Retrait USDC depuis Treasury directement vers l'utilisateur
+        treasury.operatorWithdraw(msg.sender, usdcAmount);
 
         emit TokensSold(msg.sender, gldAmount, usdcAmount, price);
     }

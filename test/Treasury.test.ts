@@ -291,6 +291,65 @@ describe("Treasury — Étape 3 : dépôt et retrait USDC", () => {
     });
   });
 
+
+  // ── 6b. OperatorWithdraw ──────────────────────────────────────────────────
+
+  describe("OperatorWithdraw", () => {
+    beforeEach(async () => {
+      await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC);
+      await treasury.connect(alice).deposit(HUNDRED_USDC);
+      await treasury.setOperator(bob.address);
+    });
+
+    it("l'opérateur peut retirer depuis le pool global", async () => {
+      const before = await mockUSDC.balanceOf(alice.address);
+      await treasury.connect(bob).operatorWithdraw(alice.address, HUNDRED_USDC);
+      expect(await mockUSDC.balanceOf(alice.address)).to.equal(before + HUNDRED_USDC);
+    });
+
+    it("emit l'event OperatorWithdrawn", async () => {
+      await expect(treasury.connect(bob).operatorWithdraw(alice.address, HUNDRED_USDC))
+        .to.emit(treasury, "OperatorWithdrawn")
+        .withArgs(alice.address, HUNDRED_USDC);
+    });
+
+    it("le owner peut aussi appeler operatorWithdraw", async () => {
+      await expect(
+        treasury.connect(owner).operatorWithdraw(alice.address, HUNDRED_USDC)
+      ).to.not.revert(ethers);
+    });
+
+    it("un non-opérateur ne peut pas appeler operatorWithdraw", async () => {
+      await expect(
+        treasury.connect(alice).operatorWithdraw(alice.address, ONE_USDC)
+      ).to.be.revertedWithCustomError(treasury, "UnauthorizedOperator");
+    });
+
+    it("échoue si solde Treasury insuffisant", async () => {
+      await expect(
+        treasury.connect(bob).operatorWithdraw(alice.address, HUNDRED_USDC + 1n)
+      ).to.be.revertedWithCustomError(treasury, "InsufficientBalance");
+    });
+
+    it("échoue vers address(0)", async () => {
+      await expect(
+        treasury.connect(bob).operatorWithdraw(ethers.ZeroAddress, ONE_USDC)
+      ).to.be.revertedWithCustomError(treasury, "ZeroAddress");
+    });
+
+    it("setOperator émet l'event OperatorUpdated", async () => {
+      await expect(treasury.setOperator(alice.address))
+        .to.emit(treasury, "OperatorUpdated")
+        .withArgs(bob.address, alice.address);
+    });
+
+    it("un non-owner ne peut pas changer l'opérateur", async () => {
+      await expect(
+        treasury.connect(alice).setOperator(alice.address)
+      ).to.be.revertedWithCustomError(treasury, "OwnableUnauthorizedAccount");
+    });
+  });
+
   // ── 7. UUPS Upgradeability ────────────────────────────────────────────────
 
   describe("Upgradeability (UUPS)", () => {

@@ -30,18 +30,32 @@ contract Treasury is
     /// @dev Total USDC déposé dans le contrat
     uint256 private _totalDeposited;
 
+    /// @dev Opérateur approuvé (ex: Exchange) — peut retirer depuis le pool global
+    address public operator;
+
     // ─── Events ──────────────────────────────────────────────────────────────
 
     event Deposited(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
+    event OperatorWithdrawn(address indexed to, uint256 amount);
     event EmergencyWithdrawn(address indexed to, uint256 amount);
     event UsdcAddressUpdated(address indexed oldUsdc, address indexed newUsdc);
+    event OperatorUpdated(address indexed oldOperator, address indexed newOperator);
 
     // ─── Errors ──────────────────────────────────────────────────────────────
 
     error ZeroAmount();
     error ZeroAddress();
     error InsufficientBalance(uint256 requested, uint256 available);
+    error UnauthorizedOperator(address caller);
+
+    // ─── Modifiers ───────────────────────────────────────────────────────────
+
+    modifier onlyOperator() {
+        if (msg.sender != operator && msg.sender != owner())
+            revert UnauthorizedOperator(msg.sender);
+        _;
+    }
 
     // ─── Constructor / Initializer ───────────────────────────────────────────
 
@@ -82,7 +96,7 @@ contract Treasury is
         emit Deposited(msg.sender, amount);
     }
 
-    /// @notice Retire des USDC du Treasury
+    /// @notice Retire des USDC du Treasury (solde personnel)
     /// @param amount Montant à retirer
     function withdraw(uint256 amount) external whenNotPaused {
         if (amount == 0) revert ZeroAmount();
@@ -96,6 +110,24 @@ contract Treasury is
         usdc.safeTransfer(msg.sender, amount);
 
         emit Withdrawn(msg.sender, amount);
+    }
+
+    /// @notice Retire des USDC depuis le pool global vers une adresse
+    /// @dev Réservé à l'opérateur (Exchange) — utilisé lors des ventes GLD
+    /// @param to     Adresse destinataire (l'utilisateur qui vend)
+    /// @param amount Montant à envoyer
+    function operatorWithdraw(address to, uint256 amount) external whenNotPaused onlyOperator {
+        if (to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+
+        uint256 available = usdc.balanceOf(address(this));
+        if (amount > available) revert InsufficientBalance(amount, available);
+
+        _totalDeposited -= amount;
+
+        usdc.safeTransfer(to, amount);
+
+        emit OperatorWithdrawn(to, amount);
     }
 
     // ─── Vues ────────────────────────────────────────────────────────────────
@@ -112,18 +144,16 @@ contract Treasury is
 
     // ─── Fonctions owner ─────────────────────────────────────────────────────
 
-    /// @notice Suspend les dépôts et retraits
-    function pause() external onlyOwner {
-        _pause();
-    }
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 
-    /// @notice Reprend les dépôts et retraits
-    function unpause() external onlyOwner {
-        _unpause();
+    /// @notice Définit l'opérateur approuvé (ex: Exchange)
+    function setOperator(address newOperator) external onlyOwner {
+        emit OperatorUpdated(operator, newOperator);
+        operator = newOperator;
     }
 
     /// @notice Retire tous les USDC vers une adresse (urgence)
-    /// @param to Adresse de destination
     function emergencyWithdraw(address to) external onlyOwner {
         if (to == address(0)) revert ZeroAddress();
         uint256 balance = usdc.balanceOf(address(this));
@@ -132,8 +162,7 @@ contract Treasury is
         emit EmergencyWithdrawn(to, balance);
     }
 
-    /// @notice Met à jour l'adresse USDC (ex: migration mock → officiel)
-    /// @param newUsdc Nouvelle adresse USDC
+    /// @notice Met à jour l'adresse USDC
     function setUsdcAddress(address newUsdc) external onlyOwner {
         if (newUsdc == address(0)) revert ZeroAddress();
         emit UsdcAddressUpdated(address(usdc), newUsdc);
