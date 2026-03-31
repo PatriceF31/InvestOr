@@ -1,0 +1,139 @@
+import Link from "next/link";
+import { useRouter } from "next/router";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useTranslations } from "next-intl";
+import { Sun, Moon, Globe } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+
+const NAV_LINKS = [
+  { key: "dashboard", href: "/" },
+  { key: "trade",     href: "/trade" },
+  { key: "deposit",   href: "/deposit" },
+  { key: "reserve",   href: "/reserve" },
+  { key: "history",   href: "/history" },
+  { key: "price",     href: "/price" },
+];
+
+export default function Navbar() {
+  const t = useTranslations("nav");
+  const router = useRouter();
+  const { locale, pathname, query, asPath } = router;
+  const [dark, setDark] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Initialiser le thème depuis localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const isDark = saved ? saved === "dark" : prefersDark;
+    setDark(isDark);
+    document.documentElement.classList.toggle("dark", isDark);
+    setMounted(true);
+  }, []);
+
+  const toggleTheme = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  };
+
+  const toggleLocale = () => {
+    const next = locale === "fr" ? "pt" : "fr";
+    router.push({ pathname, query }, asPath, { locale: next });
+  };
+
+  const isActive = (href: string) => {
+    const current = pathname.replace(/^\/[a-z]{2}/, "") || "/";
+    return current === href;
+  };
+
+  return (
+    <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2 shrink-0">
+            <span className="text-2xl font-bold text-primary">InvestOr</span>
+            <span className="hidden sm:inline text-xs text-muted-foreground border border-border rounded px-1.5 py-0.5">
+              Gold Token
+            </span>
+          </Link>
+
+          {/* Navigation centrale */}
+          <div className="hidden md:flex items-center gap-1">
+            {NAV_LINKS.map(({ key, href }) => (
+              <Link
+                key={key}
+                href={href}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  isActive(href)
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                }`}
+              >
+                {t(key)}
+              </Link>
+            ))}
+          </div>
+
+          {/* Actions droite */}
+          <div className="flex items-center gap-2">
+            {/* Switch langue */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleLocale}
+              className="gap-1.5 text-muted-foreground"
+              aria-label="Changer de langue"
+            >
+              <Globe className="h-4 w-4" />
+              <span className="text-xs font-medium uppercase">{locale}</span>
+            </Button>
+
+            {/* Switch thème */}
+            {mounted && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                aria-label="Changer le thème"
+              >
+                {dark
+                  ? <Sun className="h-4 w-4 text-muted-foreground" />
+                  : <Moon className="h-4 w-4 text-muted-foreground" />
+                }
+              </Button>
+            )}
+
+            {/* Connect Wallet */}
+            <ConnectButton
+              showBalance={false}
+              chainStatus="icon"
+              accountStatus="avatar"
+            />
+          </div>
+        </div>
+
+        {/* Navigation mobile */}
+        <div className="md:hidden flex gap-1 pb-3 overflow-x-auto">
+          {NAV_LINKS.map(({ key, href }) => (
+            <Link
+              key={key}
+              href={href}
+              className={`shrink-0 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                isActive(href)
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
+            >
+              {t(key)}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </nav>
+  );
+}
