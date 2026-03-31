@@ -138,4 +138,11 @@ contract GLD is
     // ─── UUPS ────────────────────────────────────────────────────────────────
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    // ─── Storage gap ─────────────────────────────────────────────────────────
+
+    /// @dev Réserve 48 slots pour les futures variables de storage
+    /// @dev Toujours garder total storage (variables + gap) = 50 slots
+    /// @dev Variables actuelles : _blacklisted (1) + minter (1) = 2 slots utilisés
+    uint256[48] private __gap;
 }

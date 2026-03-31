@@ -73,8 +73,11 @@ contract Exchange is
     event TokensSold(address indexed seller, uint256 gldAmount, uint256 usdcAmount, uint256 price);
     event FallbackPriceUpdated(uint256 oldPrice, uint256 newPrice);
     event OracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event OracleMaxAgeUpdated(uint256 oldMaxAge, uint256 newMaxAge);
     event FeeBpsUpdated(uint256 oldFee, uint256 newFee);
     event FeeCollectorUpdated(address indexed oldCollector, address indexed newCollector);
+    event ContractsPaused(address indexed by);
+    event ContractsUnpaused(address indexed by);
 
     // ─── Errors ──────────────────────────────────────────────────────────────
 
@@ -220,8 +223,14 @@ contract Exchange is
 
     // ─── Admin ───────────────────────────────────────────────────────────────
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+        emit ContractsPaused(msg.sender);
+    }
+    function unpause() external onlyOwner {
+        _unpause();
+        emit ContractsUnpaused(msg.sender);
+    }
 
     /// @notice Met à jour le prix fallback
     function setFallbackPrice(uint256 newPrice) external onlyOwner {
@@ -238,6 +247,7 @@ contract Exchange is
 
     /// @notice Met à jour la durée max de fraîcheur oracle
     function setOracleMaxAge(uint256 newMaxAge) external onlyOwner {
+        emit OracleMaxAgeUpdated(oracleMaxAge, newMaxAge);
         oracleMaxAge = newMaxAge;
     }
 
@@ -257,4 +267,11 @@ contract Exchange is
     // ─── UUPS ────────────────────────────────────────────────────────────────
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    // ─── Storage gap ─────────────────────────────────────────────────────────
+
+    /// @dev Réserve 44 slots pour les futures variables de storage
+    /// @dev Variables actuelles : gld(1) + treasury(1) + usdc(1) + priceOracle(1)
+    /// @dev   + fallbackPrice(1) + oracleMaxAge(1) + feeBps(1) + feeCollector(1) = 8 slots utilisés
+    uint256[42] private __gap;
 }

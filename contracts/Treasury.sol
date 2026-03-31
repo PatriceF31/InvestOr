@@ -172,4 +172,10 @@ contract Treasury is
     // ─── UUPS ────────────────────────────────────────────────────────────────
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    // ─── Storage gap ─────────────────────────────────────────────────────────
+
+    /// @dev Réserve 47 slots pour les futures variables de storage
+    /// @dev Variables actuelles : usdc (1) + _deposits (1) + _totalDeposited (1) + operator (1) = 4 slots utilisés
+    uint256[46] private __gap;
 }
