@@ -29,6 +29,9 @@
     "test:gld": "npm run compile && hardhat test test/GLD.test.ts",
     "test:treasury": "npm run compile && hardhat test test/Treasury.test.ts",
     "test:exchange": "npm run compile && hardhat test test/Exchange.test.ts",
+    "test:reserve": "npm run compile && hardhat test test/Reserve.test.ts",
+    "test:serial": "npm run compile && hardhat test test/SerialNumber.test.ts",
     "test:all": "npm run compile && hardhat test"
+
   }
 }

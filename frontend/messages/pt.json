@@ -1,0 +1,100 @@
+{
+  "nav": {
+    "dashboard": "Painel",
+    "trade": "Comprar / Vender",
+    "deposit": "Depósito USDC",
+    "history": "Histórico",
+    "reserve": "Reserva",
+    "admin": "Administração",
+    "price": "Preço do ouro"
+  },
+  "dashboard": {
+    "title": "Painel",
+    "balance_gld": "Saldo GLD",
+    "balance_usdc": "Saldo USDC",
+    "gold_price": "Preço do ouro",
+    "reserve_ratio": "Rácio de reserva",
+    "per_gram": "por grama",
+    "healthy": "Saudável",
+    "at_risk": "Em risco"
+  },
+  "trade": {
+    "title": "Comprar / Vender GLD",
+    "buy": "Comprar",
+    "sell": "Vender",
+    "amount_usdc": "Montante USDC",
+    "amount_gld": "Montante GLD",
+    "you_receive": "Você recebe",
+    "you_pay": "Você paga",
+    "approve": "Aprovar",
+    "confirm": "Confirmar",
+    "preview": "Pré-visualizar",
+    "price_per_gram": "Preço / grama",
+    "slippage": "Derrapagem máx."
+  },
+  "deposit": {
+    "title": "Depósito / Levantamento USDC",
+    "deposit": "Depositar",
+    "withdraw": "Levantar",
+    "your_balance": "O seu saldo",
+    "treasury_balance": "Saldo do Treasury",
+    "amount": "Montante"
+  },
+  "reserve": {
+    "title": "Estado da Reserva",
+    "proof_of_reserve": "Verificar reserva",
+    "usdc_reserve": "Reserva USDC",
+    "gld_supply": "GLD em circulação",
+    "gold_value": "Valor ouro (USDC)",
+    "ratio": "Rácio de colateralização",
+    "min_ratio": "Rácio mínimo",
+    "deficit": "Défice",
+    "recapitalize": "Recapitalizar",
+    "last_check": "Última verificação",
+    "status_healthy": "Saudável",
+    "status_at_risk": "Em risco"
+  },
+  "history": {
+    "title": "Histórico de operações",
+    "action": "Ação",
+    "amount": "Montante",
+    "price": "Preço",
+    "date": "Data",
+    "filter_all": "Todas",
+    "no_history": "Nenhuma operação"
+  },
+  "admin": {
+    "title": "Administração",
+    "set_minter": "Definir minter",
+    "set_operator": "Definir operador",
+    "set_oracle": "Atualizar oracle",
+    "set_fallback_price": "Preço fallback",
+    "set_min_ratio": "Rácio mínimo",
+    "pause_exchange": "Pausar Exchange",
+    "unpause_exchange": "Retomar Exchange",
+    "blacklist": "Blacklist",
+    "emergency_withdraw": "Levantamento de emergência"
+  },
+  "common": {
+    "connect_wallet": "Conectar carteira",
+    "disconnect": "Desconectar",
+    "loading": "A carregar...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "confirm_tx": "Confirme na sua carteira",
+    "tx_pending": "Transação em curso...",
+    "tx_success": "Transação bem-sucedida",
+    "tx_error": "Erro de transação",
+    "not_connected": "Carteira não conectada",
+    "wrong_network": "Rede incorreta"
+  },
+  "price": {
+    "title": "Preço do ouro em tempo real",
+    "xau_usd": "XAU/USD",
+    "per_gram": "Por grama",
+    "per_oz": "Por onça",
+    "source_oracle": "Fonte: Oracle Chainlink",
+    "source_api": "Fonte: API (fallback)",
+    "last_update": "Última atualização"
+  }
+}

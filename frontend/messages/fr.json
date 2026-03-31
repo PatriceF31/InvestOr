@@ -1,0 +1,100 @@
+{
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "trade": "Acheter / Vendre",
+    "deposit": "Dépôt USDC",
+    "history": "Historique",
+    "reserve": "Réserve",
+    "admin": "Administration",
+    "price": "Prix de l'or"
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "balance_gld": "Solde GLD",
+    "balance_usdc": "Solde USDC",
+    "gold_price": "Prix de l'or",
+    "reserve_ratio": "Ratio de réserve",
+    "per_gram": "par gramme",
+    "healthy": "Sain",
+    "at_risk": "En risque"
+  },
+  "trade": {
+    "title": "Acheter / Vendre GLD",
+    "buy": "Acheter",
+    "sell": "Vendre",
+    "amount_usdc": "Montant USDC",
+    "amount_gld": "Montant GLD",
+    "you_receive": "Vous recevez",
+    "you_pay": "Vous payez",
+    "approve": "Approuver",
+    "confirm": "Confirmer",
+    "preview": "Aperçu",
+    "price_per_gram": "Prix / gramme",
+    "slippage": "Glissement max"
+  },
+  "deposit": {
+    "title": "Dépôt / Retrait USDC",
+    "deposit": "Déposer",
+    "withdraw": "Retirer",
+    "your_balance": "Votre solde",
+    "treasury_balance": "Solde Treasury",
+    "amount": "Montant"
+  },
+  "reserve": {
+    "title": "État de la Réserve",
+    "proof_of_reserve": "Vérifier la réserve",
+    "usdc_reserve": "Réserve USDC",
+    "gld_supply": "GLD en circulation",
+    "gold_value": "Valeur or (USDC)",
+    "ratio": "Ratio de collatéralisation",
+    "min_ratio": "Ratio minimum",
+    "deficit": "Déficit",
+    "recapitalize": "Recapitaliser",
+    "last_check": "Dernier contrôle",
+    "status_healthy": "Sain",
+    "status_at_risk": "En risque"
+  },
+  "history": {
+    "title": "Historique des opérations",
+    "action": "Action",
+    "amount": "Montant",
+    "price": "Prix",
+    "date": "Date",
+    "filter_all": "Toutes",
+    "no_history": "Aucune opération"
+  },
+  "admin": {
+    "title": "Administration",
+    "set_minter": "Définir le minter",
+    "set_operator": "Définir l'opérateur",
+    "set_oracle": "Mettre à jour l'oracle",
+    "set_fallback_price": "Prix fallback",
+    "set_min_ratio": "Ratio minimum",
+    "pause_exchange": "Pauser Exchange",
+    "unpause_exchange": "Reprendre Exchange",
+    "blacklist": "Blacklister",
+    "emergency_withdraw": "Retrait d'urgence"
+  },
+  "common": {
+    "connect_wallet": "Connecter le portefeuille",
+    "disconnect": "Déconnecter",
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "confirm_tx": "Confirmer dans votre portefeuille",
+    "tx_pending": "Transaction en cours...",
+    "tx_success": "Transaction réussie",
+    "tx_error": "Erreur de transaction",
+    "not_connected": "Portefeuille non connecté",
+    "wrong_network": "Mauvais réseau"
+  },
+  "price": {
+    "title": "Prix de l'or en temps réel",
+    "xau_usd": "XAU/USD",
+    "per_gram": "Par gramme",
+    "per_oz": "Par once",
+    "source_oracle": "Source : Oracle Chainlink",
+    "source_api": "Source : API (fallback)",
+    "last_update": "Dernière mise à jour"
+  }
+}
