@@ -50,7 +50,7 @@ describe("Reserve — Étapes 8 & 14 : Réserve + Proof of Reserve", () => {
     // GLD impl + proxy
     const GLDFactory = await ethers.getContractFactory("GLD");
     const gldImpl = await GLDFactory.deploy();
-    const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy");
+    const ProxyFactory = await ethers.getContractFactory("InvestOrProxy");
     const gldInitData = gldImpl.interface.encodeFunctionData("initialize", [owner.address]);
     const gldProxy = await ProxyFactory.deploy(await gldImpl.getAddress(), gldInitData);
     gld = await ethers.getContractAt("GLD", await gldProxy.getAddress());
