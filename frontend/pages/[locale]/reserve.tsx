@@ -55,7 +55,12 @@ export default function ReservePage() {
   const price          = status?.[7];
   const deficitUsdc    = status?.[8];
 
-  const ratioPercent   = ratioBps    !== undefined ? (Number(ratioBps)    / 100).toFixed(1) : "—";
+  // MaxUint256 → gldSupply = 0 → ratio infini → afficher "∞"
+  const ratioPercent = (() => {
+    if (ratioBps === undefined) return "—";
+    if (ratioBps > 100_000n) return "∞";
+    return (Number(ratioBps) / 100).toFixed(1);
+  })();
   const minRatioPercent = minRatioBps !== undefined ? (Number(minRatioBps) / 100).toFixed(0) : "—";
   const lastCheck      = "—"; // timestamp non disponible via getReserveStatus
 

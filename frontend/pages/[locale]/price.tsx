@@ -77,9 +77,11 @@ export default function PricePage() {
   }, [refetch, refreshApi]);
 
   // Calculs
+  // getPrice() retourne toujours en $/gramme (8 décimales)
+  // Exchange.sol travaille en $/gramme nativement
   const onChainPerGram = onChainPrice !== undefined
     ? Number(onChainPrice) / 1e8 : null;
-  const onChainPerOz   = onChainPerGram !== null
+  const onChainPerOz = onChainPerGram !== null
     ? onChainPerGram * TROY_OZ_TO_GRAM : null;
 
   const apiPerOz   = apiData?.price    ?? null;

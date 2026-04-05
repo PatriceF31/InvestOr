@@ -91,7 +91,7 @@ export default function DashboardPage() {
           icon={Coins}
           label={t("balance_gld")}
           value={`${formatted.gldBalance} GLD`}
-          sub={`≈ ${formatted.gldBalance !== "—" ? `${Number(formatted.gldBalance).toFixed(3)} g` : "—"} d'or`}
+          sub={`≈ ${formatted.gldBalance !== "—" ? `${parseFloat(formatted.gldBalance).toFixed(3)} g` : "—"} d'or`}
         />
         <StatCard
           icon={Wallet}
@@ -110,7 +110,7 @@ export default function DashboardPage() {
         <StatCard
           icon={Shield}
           label={t("reserve_ratio")}
-          value={reserve.ratioPercent}
+          value={reserve.ratioPercent === "∞" || reserve.ratioPercent === "—" ? reserve.ratioPercent : `${reserve.ratioPercent}`}
           sub={`Min : ${reserve.minRatioBps !== undefined ? (Number(reserve.minRatioBps) / 100).toFixed(0) : "—"}%`}
           badge={reserve.healthy ? t("healthy") : t("at_risk")}
           badgeVariant={reserve.healthy ? "default" : "destructive"}
@@ -137,7 +137,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">Valeur or (USDC)</p>
             <p className="text-lg font-semibold">
               {reserve.goldValueUsdc !== undefined
-                ? `${(Number(reserve.goldValueUsdc) / 1e6).toFixed(2)} USDC`
+                ? `${parseFloat((Number(reserve.goldValueUsdc) / 1e6).toFixed(2))} USDC`
                 : "—"
               }
             </p>

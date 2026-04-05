@@ -83,9 +83,9 @@ contract Treasury is
     // ─── Fonctions utilisateur ───────────────────────────────────────────────
 
     /// @notice Dépose des USDC dans le Treasury
-    /// @dev L'utilisateur doit avoir appelé usdc.approve(treasury, amount) avant
+    /// @dev Réservé à l'opérateur (Exchange) et au owner (admins)
     /// @param amount Montant en unités USDC (6 décimales)
-    function deposit(uint256 amount) external whenNotPaused {
+    function deposit(uint256 amount) external whenNotPaused onlyOperator {
         if (amount == 0) revert ZeroAmount();
 
         _deposits[msg.sender] += amount;
@@ -96,15 +96,15 @@ contract Treasury is
         emit Deposited(msg.sender, amount);
     }
 
-    /// @notice Retire des USDC du Treasury (solde personnel)
+    /// @notice Retire des USDC du Treasury
+    /// @dev Réservé à l'opérateur (Exchange) et au owner (admins)
     /// @param amount Montant à retirer
-    function withdraw(uint256 amount) external whenNotPaused {
+    function withdraw(uint256 amount) external whenNotPaused onlyOperator {
         if (amount == 0) revert ZeroAmount();
 
-        uint256 available = _deposits[msg.sender];
+        uint256 available = usdc.balanceOf(address(this));
         if (amount > available) revert InsufficientBalance(amount, available);
 
-        _deposits[msg.sender] -= amount;
         _totalDeposited -= amount;
 
         usdc.safeTransfer(msg.sender, amount);

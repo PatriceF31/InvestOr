@@ -94,7 +94,7 @@ describe("Reserve — Étapes 8 & 14 : Réserve + Proof of Reserve", () => {
     // Rôles
     await gld.setMinter(await exchangeProxy.getAddress());
     await treasury.setOperator(await exchangeProxy.getAddress());
-    await exchange.transferOwnership(await reserveProxy.getAddress());
+    await exchange.transferOwnership(await reserve.getAddress());
 
     // Fonds alice
     await mockUSDC.mint(alice.address, THOUSAND_USDC);
@@ -314,55 +314,56 @@ describe("Reserve — Étapes 8 & 14 : Réserve + Proof of Reserve", () => {
 
   // ── 6. recapitalize ───────────────────────────────────────────────────────
 
-  describe("recapitalize", () => {
+describe("recapitalize", () => {
     beforeEach(async () => {
       await aliceBuys(HUNDRED_USDC);
       await oracle.setPrice(PRICE_108); // crée un déficit
       await reserve.proofOfReserve();   // Exchange pausé
+      // Reserve doit être opérateur du Treasury pour pouvoir déposer
+      await treasury.setOperator(await reserve.getAddress());
     });
 
     it("injecte des USDC dans le Treasury", async () => {
       const before = await treasury.totalDeposited();
-      await mockUSDC.mint(bob.address, 20n * ONE_USDC);
-      await mockUSDC.connect(bob).approve(await reserve.getAddress(), 20n * ONE_USDC);
-      await reserve.connect(bob).recapitalize(20n * ONE_USDC);
+      await mockUSDC.mint(owner.address, 20n * ONE_USDC);
+      await mockUSDC.connect(owner).approve(await reserve.getAddress(), 20n * ONE_USDC);
+      await reserve.connect(owner).recapitalize(20n * ONE_USDC);
       expect(await treasury.totalDeposited()).to.equal(before + 20n * ONE_USDC);
     });
 
     it("emit Recapitalized", async () => {
-      await mockUSDC.mint(bob.address, 20n * ONE_USDC);
-      await mockUSDC.connect(bob).approve(await reserve.getAddress(), 20n * ONE_USDC);
-      await expect(reserve.connect(bob).recapitalize(20n * ONE_USDC))
+      await mockUSDC.mint(owner.address, 20n * ONE_USDC);
+      await mockUSDC.connect(owner).approve(await reserve.getAddress(), 20n * ONE_USDC);
+      await expect(reserve.connect(owner).recapitalize(20n * ONE_USDC))
         .to.emit(reserve, "Recapitalized");
     });
 
-    it("réactive Exchange si ratio restauré après recapitalize", async () => {
+    it("réactive Exchange si ratio restauré après recapitalize (owner)", async () => {
       expect(await exchange.paused()).to.be.true;
-      // Injecter suffisamment
       const deficit = (await reserve.getReserveStatus()).deficitUsdc;
-      await mockUSDC.mint(bob.address, deficit + ONE_USDC);
-      await mockUSDC.connect(bob).approve(await reserve.getAddress(), deficit + ONE_USDC);
-      await reserve.connect(bob).recapitalize(deficit + ONE_USDC);
+      await mockUSDC.mint(owner.address, deficit + ONE_USDC);
+      await mockUSDC.connect(owner).approve(await reserve.getAddress(), deficit + ONE_USDC);
+      await reserve.connect(owner).recapitalize(deficit + ONE_USDC);
       expect(await exchange.paused()).to.be.false;
     });
 
-    it("n'importe qui peut recapitaliser", async () => {
+    it("un non-owner ne peut pas recapitaliser", async () => {
       await mockUSDC.mint(alice.address, 5n * ONE_USDC);
       await mockUSDC.connect(alice).approve(await reserve.getAddress(), 5n * ONE_USDC);
       await expect(
         reserve.connect(alice).recapitalize(5n * ONE_USDC)
-      ).to.not.revert(ethers);
+      ).to.be.revertedWithCustomError(reserve, "OwnableUnauthorizedAccount");
     });
 
     it("échoue avec montant nul", async () => {
       await expect(
-        reserve.connect(bob).recapitalize(0n)
+        reserve.connect(owner).recapitalize(0n)
       ).to.be.revertedWithCustomError(reserve, "ZeroAmount");
     });
 
     it("échoue sans approbation USDC", async () => {
       await expect(
-        reserve.connect(bob).recapitalize(20n * ONE_USDC)
+        reserve.connect(owner).recapitalize(20n * ONE_USDC)
       ).to.revert(ethers);
     });
   });

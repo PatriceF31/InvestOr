@@ -77,7 +77,8 @@ export function useDashboard() {
       // USDC : decimals = 6
       usdcBalance: usdcBalance !== undefined ? formatUnits(usdcBalance, 6) : "—",
       usdcTotal:   usdcTotal   !== undefined ? formatUnits(usdcTotal, 6)   : "—",
-      // Prix : 8 décimales Chainlink → $/gramme
+      // Prix Chainlink XAU/USD : 8 décimales, valeur par ONCE troy
+      // Prix en $/gramme directement (8 décimales)
       pricePerGram: price !== undefined
         ? `$${(Number(price) / 1e8).toFixed(2)}`
         : "—",
@@ -98,9 +99,14 @@ export function useDashboard() {
       price:          reserveStatus?.[7],
       deficitUsdc:    reserveStatus?.[8],
       // Ratio formaté : 10000 bps = 100%
-      ratioPercent: reserveStatus?.[3] !== undefined
-        ? (Number(reserveStatus[3]) / 100).toFixed(1) + "%"
-        : "—",
+      // MaxUint256 = supply GLD = 0 → afficher "∞" (sur-collatéralisé)
+      ratioPercent: (() => {
+        const r = reserveStatus?.[3];
+        if (r === undefined) return "—";
+        // MaxUint256 ou valeur astronomique → supply = 0, ratio infini
+        if (r > 100_000n) return "∞";
+        return (Number(r) / 100).toFixed(1) + "%";
+      })(),
     },
 
     isOracle,

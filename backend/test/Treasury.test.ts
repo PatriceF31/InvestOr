@@ -42,7 +42,8 @@ describe("Treasury — Étape 3 : dépôt et retrait USDC", () => {
     });
     treasury = await ethers.getContractAt("Treasury", await proxy.getAddress());
 
-    // 3. Mint USDC pour alice et bob
+    // 3. Mint USDC pour owner, alice et bob
+    await mockUSDC.mint(owner.address, THOUSAND_USDC);
     await mockUSDC.mint(alice.address, THOUSAND_USDC);
     await mockUSDC.mint(bob.address,   THOUSAND_USDC);
   });
@@ -72,52 +73,54 @@ describe("Treasury — Étape 3 : dépôt et retrait USDC", () => {
   // ── 2. Dépôt ──────────────────────────────────────────────────────────────
 
   describe("Deposit", () => {
-    it("un utilisateur peut déposer des USDC", async () => {
-      await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await treasury.connect(alice).deposit(HUNDRED_USDC);
+    it("le owner peut déposer des USDC (admin/collatéral)", async () => {
+      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
+      await treasury.connect(owner).deposit(HUNDRED_USDC);
 
-      expect(await treasury.balanceOf(alice.address)).to.equal(HUNDRED_USDC);
       expect(await treasury.totalDeposited()).to.equal(HUNDRED_USDC);
     });
 
     it("le solde USDC du treasury augmente après dépôt", async () => {
-      await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await treasury.connect(alice).deposit(HUNDRED_USDC);
+      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
+      await treasury.connect(owner).deposit(HUNDRED_USDC);
 
       expect(
         await mockUSDC.balanceOf(await treasury.getAddress())
       ).to.equal(HUNDRED_USDC);
     });
 
-    it("plusieurs utilisateurs peuvent déposer indépendamment", async () => {
+    it("un non-opérateur ne peut pas déposer", async () => {
       await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await mockUSDC.connect(bob).approve(await treasury.getAddress(), HUNDRED_USDC * 2n);
-      await treasury.connect(alice).deposit(HUNDRED_USDC);
-      await treasury.connect(bob).deposit(HUNDRED_USDC * 2n);
-
-      expect(await treasury.balanceOf(alice.address)).to.equal(HUNDRED_USDC);
-      expect(await treasury.balanceOf(bob.address)).to.equal(HUNDRED_USDC * 2n);
-      expect(await treasury.totalDeposited()).to.equal(HUNDRED_USDC * 3n);
+      await expect(
+        treasury.connect(alice).deposit(HUNDRED_USDC)
+      ).to.be.revertedWithCustomError(treasury, "UnauthorizedOperator");
     });
 
-    it("dépôts cumulatifs pour un même utilisateur", async () => {
-      await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC * 2n);
-      await treasury.connect(alice).deposit(HUNDRED_USDC);
-      await treasury.connect(alice).deposit(HUNDRED_USDC);
+    it("un non-opérateur ne peut pas déposer (bob)", async () => {
+      await mockUSDC.connect(bob).approve(await treasury.getAddress(), HUNDRED_USDC);
+      await expect(
+        treasury.connect(bob).deposit(HUNDRED_USDC)
+      ).to.be.revertedWithCustomError(treasury, "UnauthorizedOperator");
+    });
 
-      expect(await treasury.balanceOf(alice.address)).to.equal(HUNDRED_USDC * 2n);
+    it("dépôts cumulatifs par le owner", async () => {
+      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC * 2n);
+      await treasury.connect(owner).deposit(HUNDRED_USDC);
+      await treasury.connect(owner).deposit(HUNDRED_USDC);
+
+      expect(await treasury.totalDeposited()).to.equal(HUNDRED_USDC * 2n);
     });
 
     it("emit l'event Deposited", async () => {
-      await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await expect(treasury.connect(alice).deposit(HUNDRED_USDC))
+      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
+      await expect(treasury.connect(owner).deposit(HUNDRED_USDC))
         .to.emit(treasury, "Deposited")
-        .withArgs(alice.address, HUNDRED_USDC);
+        .withArgs(owner.address, HUNDRED_USDC);
     });
 
     it("ne peut pas déposer un montant nul", async () => {
       await expect(
-        treasury.connect(alice).deposit(0n)
+        treasury.connect(owner).deposit(0n)
       ).to.be.revertedWithCustomError(treasury, "ZeroAmount");
     });
 
@@ -137,48 +140,44 @@ describe("Treasury — Étape 3 : dépôt et retrait USDC", () => {
 
   // ── 3. Retrait ────────────────────────────────────────────────────────────
 
-  describe("Withdraw", () => {
+describe("Withdraw", () => {
     beforeEach(async () => {
-      await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await treasury.connect(alice).deposit(HUNDRED_USDC);
+      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
+      await treasury.connect(owner).deposit(HUNDRED_USDC);
     });
 
-    it("un utilisateur peut retirer ses USDC", async () => {
-      const balanceBefore = await mockUSDC.balanceOf(alice.address);
-      await treasury.connect(alice).withdraw(HUNDRED_USDC);
-
-      expect(await treasury.balanceOf(alice.address)).to.equal(0n);
-      expect(await mockUSDC.balanceOf(alice.address)).to.equal(balanceBefore + HUNDRED_USDC);
+    it("le owner peut retirer des USDC", async () => {
+      await treasury.connect(owner).withdraw(HUNDRED_USDC);
+      expect(await treasury.totalDeposited()).to.equal(0n);
     });
 
     it("retrait partiel fonctionne", async () => {
-      await treasury.connect(alice).withdraw(ONE_USDC);
-      expect(await treasury.balanceOf(alice.address)).to.equal(HUNDRED_USDC - ONE_USDC);
+      await treasury.connect(owner).withdraw(ONE_USDC);
       expect(await treasury.totalDeposited()).to.equal(HUNDRED_USDC - ONE_USDC);
     });
 
     it("emit l'event Withdrawn", async () => {
-      await expect(treasury.connect(alice).withdraw(HUNDRED_USDC))
+      await expect(treasury.connect(owner).withdraw(HUNDRED_USDC))
         .to.emit(treasury, "Withdrawn")
-        .withArgs(alice.address, HUNDRED_USDC);
+        .withArgs(owner.address, HUNDRED_USDC);
     });
 
     it("ne peut pas retirer un montant nul", async () => {
       await expect(
-        treasury.connect(alice).withdraw(0n)
+        treasury.connect(owner).withdraw(0n)
       ).to.be.revertedWithCustomError(treasury, "ZeroAmount");
     });
 
-    it("ne peut pas retirer plus que son solde", async () => {
+    it("ne peut pas retirer plus que le solde du treasury", async () => {
       await expect(
-        treasury.connect(alice).withdraw(HUNDRED_USDC + 1n)
+        treasury.connect(owner).withdraw(HUNDRED_USDC + ONE_USDC)
       ).to.be.revertedWithCustomError(treasury, "InsufficientBalance");
     });
 
-    it("bob ne peut pas retirer les fonds d'alice", async () => {
+    it("un non-opérateur ne peut pas retirer", async () => {
       await expect(
-        treasury.connect(bob).withdraw(ONE_USDC)
-      ).to.be.revertedWithCustomError(treasury, "InsufficientBalance");
+        treasury.connect(alice).withdraw(HUNDRED_USDC)
+      ).to.be.revertedWithCustomError(treasury, "UnauthorizedOperator");
     });
   });
 
@@ -199,8 +198,8 @@ describe("Treasury — Étape 3 : dépôt et retrait USDC", () => {
     });
 
     it("le retrait est bloqué en pause", async () => {
-      await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await treasury.connect(alice).deposit(HUNDRED_USDC);
+      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
+      await treasury.connect(owner).deposit(HUNDRED_USDC);
       await treasury.pause();
       await expect(
         treasury.connect(alice).withdraw(HUNDRED_USDC)
@@ -224,8 +223,8 @@ describe("Treasury — Étape 3 : dépôt et retrait USDC", () => {
 
   describe("EmergencyWithdraw", () => {
     beforeEach(async () => {
-      await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await treasury.connect(alice).deposit(HUNDRED_USDC);
+      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
+      await treasury.connect(owner).deposit(HUNDRED_USDC);
     });
 
     it("le owner peut faire un emergency withdraw", async () => {
@@ -296,8 +295,8 @@ describe("Treasury — Étape 3 : dépôt et retrait USDC", () => {
 
   describe("OperatorWithdraw", () => {
     beforeEach(async () => {
-      await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await treasury.connect(alice).deposit(HUNDRED_USDC);
+      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
+      await treasury.connect(owner).deposit(HUNDRED_USDC);
       await treasury.setOperator(bob.address);
     });
 

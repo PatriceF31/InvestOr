@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { key: "reserve",   href: "/reserve" },
   { key: "history",   href: "/history" },
   { key: "price",     href: "/price" },
+  { key: "admin",     href: "/admin" },
 ];
 
 export default function Navbar() {
