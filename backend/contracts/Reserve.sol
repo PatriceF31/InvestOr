@@ -36,6 +36,9 @@ interface IExchange {
     function unpause() external;
     function paused() external view returns (bool);
     function fallbackPrice() external view returns (uint256);
+    function setOracle(address newOracle) external;
+    function setFallbackPrice(uint256 newPrice) external;
+    function transferOwnership(address newOwner) external; 
 }
 
 /// @title Reserve — Surveillance et Proof of Reserve du protocole InvestOr
@@ -319,6 +322,22 @@ contract Reserve is
     function setOracle(address newOracle) external onlyOwner {
         emit OracleUpdated(address(oracle), newOracle);
         oracle = IOracle(newOracle);
+    }
+
+    /// @notice Transfère l'ownership de l'Exchange vers une nouvelle adresse
+    /// @dev Utile pour migrer vers une nouvelle Reserve
+    function setExchangeOwner(address newOwner) external onlyOwner {
+        IExchange(address(exchange)).transferOwnership(newOwner);
+    }
+
+    /// @notice Met à jour l'oracle de l'Exchange
+    function setExchangeOracle(address newOracle) external onlyOwner {
+        IExchange(address(exchange)).setOracle(newOracle);
+    }
+
+    /// @notice Met à jour le prix fallback de l'Exchange
+    function setExchangeFallbackPrice(uint256 newPrice) external onlyOwner {
+        IExchange(address(exchange)).setFallbackPrice(newPrice);
     }
 
     // ─── UUPS ────────────────────────────────────────────────────────────────
