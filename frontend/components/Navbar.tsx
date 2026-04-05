@@ -4,15 +4,22 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useTranslations } from "next-intl";
 import { Sun, Moon, Globe } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useAccount, useReadContract } from "wagmi";
 import { Button } from "@/components/ui/button";
+import { useContracts } from "@/hooks/useContracts";
 
-const NAV_LINKS = [
+// Liens publics — visibles par tous
+const PUBLIC_LINKS = [
   { key: "dashboard", href: "/" },
   { key: "trade",     href: "/trade" },
-  { key: "deposit",   href: "/deposit" },
   { key: "reserve",   href: "/reserve" },
   { key: "history",   href: "/history" },
   { key: "price",     href: "/price" },
+];
+
+// Liens admin — visibles uniquement par le owner
+const ADMIN_LINKS = [
+  { key: "deposit",   href: "/deposit" },
   { key: "admin",     href: "/admin" },
 ];
 
@@ -22,6 +29,24 @@ export default function Navbar() {
   const { locale, pathname, query, asPath } = router;
   const [dark, setDark] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const { address, isConnected } = useAccount();
+  const { gld } = useContracts();
+
+  // Vérifier si l'adresse connectée est le owner du contrat GLD
+  const { data: ownerAddress } = useReadContract({
+    ...gld,
+    functionName: "owner",
+  });
+
+  const isOwner = isConnected &&
+    address !== undefined &&
+    ownerAddress !== undefined &&
+    address.toLowerCase() === (ownerAddress as string).toLowerCase();
+
+  const NAV_LINKS = [
+    ...PUBLIC_LINKS,
+    ...(mounted && isOwner ? ADMIN_LINKS : []),
+  ];
 
   // Initialiser le thème depuis localStorage
   useEffect(() => {
