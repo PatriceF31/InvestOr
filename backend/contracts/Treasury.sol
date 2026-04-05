@@ -130,6 +130,16 @@ contract Treasury is
         emit OperatorWithdrawn(to, amount);
     }
 
+    /// @notice Injecte des USDC directement (recapitalization par Reserve)
+    function injectCapital(uint256 amount) external whenNotPaused {
+        if (msg.sender != owner() && msg.sender != operator)
+            revert UnauthorizedOperator(msg.sender);
+        if (amount == 0) revert ZeroAmount();
+        IERC20(address(usdc)).safeTransferFrom(msg.sender, address(this), amount);
+        _totalDeposited += amount;
+        emit Deposited(msg.sender, amount);
+    }
+
     // ─── Vues ────────────────────────────────────────────────────────────────
 
     /// @notice Retourne le solde USDC déposé par un utilisateur

@@ -19,8 +19,9 @@ interface IGLDReserve {
 /// @dev Interface Treasury
 interface ITreasuryReserve {
     function totalDeposited() external view returns (uint256);
-    function deposit(uint256 amount) external;
+    //function deposit(uint256 amount) external;
     function usdc() external view returns (address);
+    function injectCapital(uint256 amount) external;
 }
 
 /// @dev Interface Oracle Chainlink
@@ -286,10 +287,10 @@ contract Reserve is
         address usdcAddr = treasury.usdc();
         IERC20 usdc = IERC20(usdcAddr);
 
-        // Transfert USDC appelant → Reserve → Treasury
-        usdc.safeTransferFrom(msg.sender, address(this), amount);
+    usdc.safeTransferFrom(msg.sender, address(this), amount);
+        // Transfert direct vers Treasury via injectCapital
         usdc.forceApprove(address(treasury), amount);
-        treasury.deposit(amount);
+        ITreasuryReserve(address(treasury)).injectCapital(amount);
 
         (, , , uint256 newRatio) = checkReserve();
 
