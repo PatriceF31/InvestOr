@@ -22,8 +22,13 @@ function DetailRow({ label, value, highlight }: { label: string; value: string; 
 
 export default function ReservePage() {
   const t = useTranslations("reserve");
-  const { address } = useAccount();
-  const { reserve, treasury } = useContracts();
+  const { address, isConnected } = useAccount();
+  const { reserve, treasury, gld } = useContracts();
+
+  // Vérifier si l'adresse connectée est owner
+  const { data: ownerAddress } = useReadContract({ ...gld, functionName: "owner" });
+  const isOwner = isConnected && address !== undefined && ownerAddress !== undefined &&
+    address.toLowerCase() === (ownerAddress as string).toLowerCase();
   const [mounted, setMounted] = useState(false);
   const [recapAmount, setRecapAmount] = useState("");
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
@@ -209,8 +214,8 @@ export default function ReservePage() {
           )}
         </div>
 
-        {/* Recapitaliser */}
-        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+        {/* Recapitaliser — admin uniquement */}
+        {isOwner && <div className="rounded-xl border border-border bg-card p-6 space-y-4">
           <div>
             <h3 className="font-semibold">{t("recapitalize")}</h3>
             <p className="text-sm text-muted-foreground mt-1">
@@ -241,7 +246,7 @@ export default function ReservePage() {
               : t("recapitalize")
             }
           </Button>
-        </div>
+        </div>}
       </div>
 
       <Button variant="ghost" size="sm" className="w-full text-muted-foreground"

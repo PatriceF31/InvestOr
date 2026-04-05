@@ -176,8 +176,8 @@ export default function AdminPage() {
             size="sm"
             disabled={isLoading}
             onClick={() => exec(() => writeContractAsync({
-              ...exchange,
-              functionName: exchangePaused ? "unpause" : "pause",
+              ...reserve,
+              functionName: exchangePaused ? "proofOfReserve" : "proofOfReserve",
             }))}>
             {exchangePaused
               ? <><Unlock className="h-4 w-4 mr-2" />{t("unpause_exchange")}</>
@@ -190,17 +190,25 @@ export default function AdminPage() {
           <div className="flex gap-2">
             <Input placeholder="0x... (0x0 pour désactiver)" value={oracleAddr} onChange={e => setOracleAddr(e.target.value)} className="font-mono text-sm" />
             <Button disabled={!oracleAddr || isLoading}
-              onClick={() => exec(() => writeContractAsync({ ...exchange, functionName: "setOracle", args: [oracleAddr as `0x${string}`] }))}>
+              onClick={() => exec(() => writeContractAsync({ 
+                ...reserve, 
+                functionName: "setExchangeOracle", 
+                args: [oracleAddr as `0x${string}`] 
+              }))}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "OK"}
             </Button>
           </div>
         </ActionRow>
         <Separator />
-        <ActionRow label={`${t("set_fallback_price")} (8 décimales, ex: 9000000000 = $90)`}>
+        <ActionRow label={`${t("set_fallback_price")} (8 décimales, ex: 14750000000 = $147.50/g)`}>
           <div className="flex gap-2">
-            <Input type="number" placeholder="9000000000" value={fallbackPrice} onChange={e => setFallbackPrice(e.target.value)} />
+            <Input type="number" placeholder="14750000000" value={fallbackPrice} onChange={e => setFallbackPrice(e.target.value)} />
             <Button disabled={!fallbackPrice || isLoading}
-              onClick={() => exec(() => writeContractAsync({ ...exchange, functionName: "setFallbackPrice", args: [BigInt(fallbackPrice)] }))}>
+              onClick={() => exec(() => writeContractAsync({ 
+                ...reserve, 
+                functionName: "setExchangeFallbackPrice", 
+                args: [BigInt(fallbackPrice)] 
+              }))}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "OK"}
             </Button>
           </div>

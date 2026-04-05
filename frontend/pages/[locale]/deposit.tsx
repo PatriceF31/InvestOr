@@ -171,7 +171,7 @@ function WithdrawPanel() {
     const parsed = parseUnits(amount, 6);
     try {
       const tx = await writeContractAsync({
-        ...treasury, functionName: "withdraw", args: [parsed],
+        ...treasury, functionName: "operatorWithdraw", args: [address, parsed],
       });
       setTxHash(tx);
       setAmount("");

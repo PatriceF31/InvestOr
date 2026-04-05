@@ -24,32 +24,29 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 // ── Statut de transaction ─────────────────────────────────────────────────────
-function TxStatus({ isPending, isConfirming, isConfirmed, isError, hash }: {
-  isPending: boolean;
-  isConfirming: boolean;
-  isConfirmed: boolean;
-  isError: boolean;
-  hash?: `0x${string}`;
-}) {
-  if (!isPending && !isConfirming && !isConfirmed && !isError) return null;
+type TxState = "idle" | "pending" | "confirming" | "success" | "error";
+
+function TxStatus({ state, hash }: { state: TxState; hash?: `0x${string}` }) {
+  if (state === "idle") return null;
 
   return (
     <div className={`rounded-lg p-4 flex items-start gap-3 text-sm ${
-      isConfirmed ? "bg-green-500/10 border border-green-500/20" :
-      isError     ? "bg-destructive/10 border border-destructive/20" :
-                    "bg-primary/10 border border-primary/20"
+      state === "success" ? "bg-green-500/10 border border-green-500/20" :
+      state === "error"   ? "bg-destructive/10 border border-destructive/20" :
+                            "bg-primary/10 border border-primary/20"
     }`}>
-      {(isPending || isConfirming) && <Loader2 className="h-4 w-4 animate-spin mt-0.5 text-primary shrink-0" />}
-      {isConfirmed && <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-500 shrink-0" />}
-      {isError && <AlertCircle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />}
+      {(state === "pending" || state === "confirming") &&
+        <Loader2 className="h-4 w-4 animate-spin mt-0.5 text-primary shrink-0" />}
+      {state === "success" && <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-500 shrink-0" />}
+      {state === "error"   && <AlertCircle  className="h-4 w-4 mt-0.5 text-destructive shrink-0" />}
       <div className="space-y-1">
         <p className="font-medium">
-          {isPending    && "Confirmez dans votre portefeuille..."}
-          {isConfirming && "Transaction en cours..."}
-          {isConfirmed  && "Transaction réussie !"}
-          {isError      && "Erreur de transaction"}
+          {state === "pending"    && "Confirmez dans votre portefeuille..."}
+          {state === "confirming" && "Transaction en cours..."}
+          {state === "success"    && "Transaction réussie !"}
+          {state === "error"      && "Erreur de transaction"}
         </p>
-        {hash && (
+        {hash && state === "success" && (
           <p className="text-xs text-muted-foreground font-mono">
             {hash.slice(0, 10)}...{hash.slice(-8)}
           </p>
@@ -67,8 +64,9 @@ function BuyPanel() {
   const [usdcInput, setUsdcInput] = useState("");
   const [step, setStep] = useState<"idle" | "approving" | "buying">("idle");
 
-  const { writeContractAsync, isPending, isError } = useWriteContract();
+  const { writeContractAsync } = useWriteContract();
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
+  const [txState, setTxState] = useState<TxState>("idle");
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
     useWaitForTransactionReceipt({ hash: txHash });
 
@@ -119,8 +117,9 @@ function BuyPanel() {
   const handleBuy = async () => {
     if (!usdcParsed || !usdcAddress || !address) return;
     try {
+      setTxState("pending");
       setStep("approving");
-      const approveTx = await writeContractAsync({
+      await writeContractAsync({
         address: usdcAddress as `0x${string}`,
         abi: [{ name: "approve", type: "function", stateMutability: "nonpayable",
           inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }],
@@ -128,22 +127,24 @@ function BuyPanel() {
         functionName: "approve",
         args: [exchange.address, usdcParsed],
       });
-      setTxHash(approveTx);
       setStep("buying");
+      setTxState("confirming");
       const buyTx = await writeContractAsync({
         ...exchange,
         functionName: "buy",
         args: [usdcParsed],
       });
       setTxHash(buyTx);
+      setTxState("success");
       setStep("idle");
       setUsdcInput("");
     } catch {
+      setTxState("error");
       setStep("idle");
     }
   };
 
-  const isLoading = isPending || isConfirming;
+  const isLoading = txState === "pending" || txState === "confirming";
 
   return (
     <div className="space-y-6">
@@ -222,13 +223,7 @@ function BuyPanel() {
       </div>
 
       {/* Statut tx */}
-      <TxStatus
-        isPending={isPending}
-        isConfirming={isConfirming}
-        isConfirmed={isConfirmed}
-        isError={isError}
-        hash={txHash}
-      />
+      <TxStatus state={txState} hash={txHash} />
 
       {/* Bouton */}
       <Button
@@ -259,8 +254,9 @@ function SellPanel() {
   const { gld, exchange } = useContracts();
   const [gldInput, setGldInput] = useState("");
 
-  const { writeContractAsync, isPending, isError } = useWriteContract();
+  const { writeContractAsync } = useWriteContract();
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
+  const [txState, setTxState] = useState<TxState>("idle");
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
     useWaitForTransactionReceipt({ hash: txHash });
 
@@ -302,17 +298,22 @@ function SellPanel() {
   const handleSell = async () => {
     if (!gldParsed || !address) return;
     try {
+      setTxState("pending");
       const sellTx = await writeContractAsync({
         ...exchange,
         functionName: "sell",
         args: [gldParsed],
       });
+      setTxState("confirming");
       setTxHash(sellTx);
+      setTxState("success");
       setGldInput("");
-    } catch {}
+    } catch {
+      setTxState("error");
+    }
   };
 
-  const isLoading = isPending || isConfirming;
+  const isLoading = txState === "pending" || txState === "confirming";
 
   return (
     <div className="space-y-6">
@@ -379,13 +380,7 @@ function SellPanel() {
       </div>
 
       {/* Statut tx */}
-      <TxStatus
-        isPending={isPending}
-        isConfirming={isConfirming}
-        isConfirmed={isConfirmed}
-        isError={isError}
-        hash={txHash}
-      />
+      <TxStatus state={txState} hash={txHash} />
 
       {/* Bouton */}
       <Button
