@@ -39,7 +39,8 @@ interface IExchange {
     function fallbackPrice() external view returns (uint256);
     function setOracle(address newOracle) external;
     function setFallbackPrice(uint256 newPrice) external;
-    function transferOwnership(address newOwner) external; 
+    function transferOwnership(address newOwner) external;
+    function setTreasury(address newTreasury) external;
 }
 
 /// @title Reserve — Surveillance et Proof of Reserve du protocole InvestOr
@@ -311,6 +312,11 @@ contract Reserve is
         if (newRatioBps == 0 || newRatioBps > 20_000) revert InvalidRatio(newRatioBps);
         emit MinRatioUpdated(minRatioBps, newRatioBps);
         minRatioBps = newRatioBps;
+    }
+
+    /// @notice Met à jour le Treasury de l'Exchange
+    function setExchangeTreasury(address newTreasury) external onlyOwner {
+        IExchange(address(exchange)).setTreasury(newTreasury);
     }
 
     /// @notice Met à jour la durée max de fraîcheur oracle

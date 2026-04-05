@@ -12,8 +12,8 @@ export type ContractAddresses = {
 // ── Adresses Sepolia ───────────────────────────────────────────────────────
 const SEPOLIA_ADDRESSES: ContractAddresses = {
   GLD:          "0xA4ddCDf84F0C0acC8cA22E77f501d308C4E87dD4",
-  Treasury:     "0x0b77e938b2ed047C103A4a0d9b5aefa1eC0f95eF",
-  Exchange:     "0xdd18eF05AEafbe9F903577eC936a92CF2E236fA9",
+  Treasury:     "0xcCb3508f3Dc41e0AeE7FFedB0f410aB555Ff40af",
+  Exchange:     "0x69C73469C427A9adbFA9a54E5a7711746A34d508",
   Reserve:      "0xF973bDafC947c032Bc3A5CafE8da36024CFe810C",
   EventLogger:  "0x70eFf6af5aCE213cEe7a3AFC4587db478c4F4b5a",
   SerialNumber: "0x24622EfA10CfBA2B6F0e2845a89B09711293867d",

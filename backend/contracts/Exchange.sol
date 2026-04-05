@@ -232,6 +232,13 @@ contract Exchange is
         emit ContractsUnpaused(msg.sender);
     }
 
+    /// @notice Met à jour l'adresse du Treasury
+    function setTreasury(address newTreasury) external onlyOwner {
+        if (newTreasury == address(0)) revert ZeroAddress();
+        treasury = ITreasury(newTreasury);
+        usdc = IERC20(ITreasury(newTreasury).usdc());
+    }
+
     /// @notice Met à jour le prix fallback
     function setFallbackPrice(uint256 newPrice) external onlyOwner {
         if (newPrice == 0) revert ZeroAmount();

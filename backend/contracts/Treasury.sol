@@ -32,6 +32,7 @@ contract Treasury is
 
     /// @dev Opérateur approuvé (ex: Exchange) — peut retirer depuis le pool global
     address public operator;
+    address public reserve;
 
     // ─── Events ──────────────────────────────────────────────────────────────
 
@@ -132,12 +133,17 @@ contract Treasury is
 
     /// @notice Injecte des USDC directement (recapitalization par Reserve)
     function injectCapital(uint256 amount) external whenNotPaused {
-        if (msg.sender != owner() && msg.sender != operator)
+        if (msg.sender != owner() && msg.sender != operator && msg.sender != reserve)
             revert UnauthorizedOperator(msg.sender);
         if (amount == 0) revert ZeroAmount();
         IERC20(address(usdc)).safeTransferFrom(msg.sender, address(this), amount);
         _totalDeposited += amount;
         emit Deposited(msg.sender, amount);
+    }
+
+    /// @notice Met à jour l'adresse du contrat Reserve
+    function setReserve(address newReserve) external onlyOwner {
+        reserve = newReserve;
     }
 
     // ─── Vues ────────────────────────────────────────────────────────────────

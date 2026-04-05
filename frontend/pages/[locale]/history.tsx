@@ -2,6 +2,8 @@ import type { GetStaticPropsContext } from "next";
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useAccount, usePublicClient } from "wagmi";
+import { createPublicClient, http } from "viem";
+import { sepolia } from "wagmi/chains";
 import { formatUnits } from "viem";
 import { useContracts } from "@/hooks/useContracts";
 import { Button } from "@/components/ui/button";
@@ -85,6 +87,11 @@ export default function HistoryPage() {
   const { address } = useAccount();
   const { exchange, treasury } = useContracts();
   const client = usePublicClient();
+  // Client dédié avec RPC public pour getLogs (Alchemy free = 10 blocs max)
+  const publicClient = createPublicClient({
+    chain: sepolia,
+    transport: http("https://ethereum-sepolia-rpc.publicnode.com"),
+  });
   const [mounted, setMounted] = useState(false);
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -95,34 +102,33 @@ export default function HistoryPage() {
     if (!client) return;
     setIsLoading(true);
     try {
-      // Limiter à ~30 jours (environ 216000 blocs sur Sepolia = ~30j à 12s/bloc)
-      // Alchemy limite les getLogs à 10000 blocs max par requête
-      const latestBlock = await client.getBlockNumber();
+      // Utiliser RPC public pour getLogs (Alchemy free = 10 blocs max)
+      const latestBlock = await publicClient.getBlockNumber();
       const fromBlock = latestBlock > 50000n ? latestBlock - 50000n : 0n;
 
       // Récupérer les logs TokensBought
-      const buyLogs = await client.getLogs({
+      const buyLogs = await publicClient.getLogs({
         address: exchange.address,
         event: ExchangeABI.find((x: any) => x.name === "TokensBought") as any,
         fromBlock,
       });
 
       // Récupérer les logs TokensSold
-      const sellLogs = await client.getLogs({
+      const sellLogs = await publicClient.getLogs({
         address: exchange.address,
         event: ExchangeABI.find((x: any) => x.name === "TokensSold") as any,
         fromBlock,
       });
 
       // Récupérer les logs Deposited
-      const depositLogs = await client.getLogs({
+      const depositLogs = await publicClient.getLogs({
         address: treasury.address,
         event: TreasuryABI.find((x: any) => x.name === "Deposited") as any,
         fromBlock,
       });
 
       // Récupérer les logs Withdrawn
-      const withdrawLogs = await client.getLogs({
+      const withdrawLogs = await publicClient.getLogs({
         address: treasury.address,
         event: TreasuryABI.find((x: any) => x.name === "Withdrawn") as any,
         fromBlock,
@@ -140,7 +146,7 @@ export default function HistoryPage() {
       await Promise.all(
         [...allBlocks].map(async (bn) => {
           try {
-            const block = await client.getBlock({ blockNumber: bn as bigint });
+            const block = await publicClient.getBlock({ blockNumber: bn as bigint });
             blockTimestamps[bn!.toString()] = Number(block.timestamp);
           } catch {}
         })
