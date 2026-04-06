@@ -45,6 +45,8 @@ export default function AdminPage() {
   const [minRatio,      setMinRatio]      = useState("");
   const [blacklistAddr, setBlacklistAddr] = useState("");
   const [emergencyTo,   setEmergencyTo]   = useState("");
+  const [recapAddr,     setRecapAddr]     = useState("");
+  const [removeRecapAddr, setRemoveRecapAddr] = useState("");
 
   const { writeContractAsync, isPending } = useWriteContract();
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
@@ -223,6 +225,26 @@ export default function AdminPage() {
             <Button disabled={!minRatio || isLoading}
               onClick={() => exec(() => writeContractAsync({ ...reserve, functionName: "setMinRatio", args: [BigInt(minRatio)] }))}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "OK"}
+            </Button>
+          </div>
+        </ActionRow>
+        <Separator />
+        <ActionRow label="Ajouter un recapitalisateur">
+          <div className="flex gap-2">
+            <Input placeholder="0x..." value={recapAddr} onChange={e => setRecapAddr(e.target.value)} className="font-mono text-sm" />
+            <Button disabled={!recapAddr || isLoading}
+              onClick={() => exec(() => writeContractAsync({ ...reserve, functionName: "addRecapitalizer", args: [recapAddr as `0x${string}`] }))}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "OK"}
+            </Button>
+          </div>
+        </ActionRow>
+        <Separator />
+        <ActionRow label="Retirer un recapitalisateur">
+          <div className="flex gap-2">
+            <Input placeholder="0x..." value={removeRecapAddr} onChange={e => setRemoveRecapAddr(e.target.value)} className="font-mono text-sm" />
+            <Button variant="destructive" disabled={!removeRecapAddr || isLoading}
+              onClick={() => exec(() => writeContractAsync({ ...reserve, functionName: "removeRecapitalizer", args: [removeRecapAddr as `0x${string}`] }))}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Retirer"}
             </Button>
           </div>
         </ActionRow>
