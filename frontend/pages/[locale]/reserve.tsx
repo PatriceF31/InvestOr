@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Shield, RefreshCw, AlertTriangle, CheckCircle, Loader2, TrendingDown } from "lucide-react";
+import { waitForTransactionReceipt } from "wagmi/actions";
+import { wagmiConfig } from "@/lib/wagmi.config";
 
 function DetailRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
@@ -87,8 +89,8 @@ export default function ReservePage() {
     if (!recapAmount || !usdcAddress) return;
     const parsed = parseUnits(recapAmount, 6);
     try {
-      // Approve + recapitalize
-      await writeContractAsync({
+      // 1. Approve et attendre confirmation
+      const approveTx = await writeContractAsync({
         address: usdcAddress as `0x${string}`,
         abi: [{ name: "approve", type: "function", stateMutability: "nonpayable",
           inputs: [{ name: "s", type: "address" }, { name: "a", type: "uint256" }],
@@ -96,6 +98,9 @@ export default function ReservePage() {
         functionName: "approve",
         args: [reserve.address, parsed],
       });
+      await waitForTransactionReceipt(wagmiConfig, { hash: approveTx });
+
+      // 2. Recapitalize
       const tx = await writeContractAsync({
         ...reserve, functionName: "recapitalize", args: [parsed],
       });

@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Wallet, ArrowDownToLine, ArrowUpFromLine, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { waitForTransactionReceipt } from "wagmi/actions";
+import { wagmiConfig } from "@/lib/wagmi.config";
 
 function TxStatus({ isPending, isConfirming, isConfirmed, isError, hash }: {
   isPending: boolean; isConfirming: boolean;
@@ -43,7 +45,7 @@ function TxStatus({ isPending, isConfirming, isConfirmed, isError, hash }: {
 function DepositPanel() {
   const t = useTranslations("deposit");
   const { address } = useAccount();
-  const { treasury } = useContracts();
+  const { treasury, reserve } = useContracts();
   const [amount, setAmount] = useState("");
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
 
@@ -80,22 +82,28 @@ function DepositPanel() {
     if (!amount || !usdcAddress || !address) return;
     const parsed = parseUnits(amount, 6);
     try {
-      // 1. Approve
-      await writeContractAsync({
+      // 1. Approve Reserve et attendre confirmation
+      const approveTx = await writeContractAsync({
         address: usdcAddress as `0x${string}`,
         abi: [{ name: "approve", type: "function", stateMutability: "nonpayable",
           inputs: [{ name: "s", type: "address" }, { name: "a", type: "uint256" }],
           outputs: [{ type: "bool" }] }] as const,
         functionName: "approve",
-        args: [treasury.address, parsed],
+        args: [reserve.address, parsed],
       });
-      // 2. Deposit
+      // Attendre confirmation de l'approve avant de continuer
+      await waitForTransactionReceipt(wagmiConfig, { hash: approveTx });
+
+      // 2. Recapitalize via Reserve
       const tx = await writeContractAsync({
-        ...treasury, functionName: "deposit", args: [parsed],
+        ...reserve, functionName: "recapitalize", args: [parsed],
       });
       setTxHash(tx);
       setAmount("");
-    } catch {}
+    } catch (e) {
+      console.error(e);
+    } finally {
+    }
   };
 
   const isLoading = isPending || isConfirming;
@@ -149,7 +157,7 @@ function DepositPanel() {
 function WithdrawPanel() {
   const t = useTranslations("deposit");
   const { address } = useAccount();
-  const { treasury } = useContracts();
+  const { treasury, reserve } = useContracts();
   const [amount, setAmount] = useState("");
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
 
@@ -219,7 +227,7 @@ function WithdrawPanel() {
 // ── Page Deposit ──────────────────────────────────────────────────────────────
 export default function DepositPage() {
   const t = useTranslations("deposit");
-  const { treasury } = useContracts();
+  const { treasury, reserve } = useContracts();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 

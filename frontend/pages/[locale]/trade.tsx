@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ArrowDownUp, TrendingUp, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { waitForTransactionReceipt } from "wagmi/actions";
+import { wagmiConfig } from "@/lib/wagmi.config";
 
 // ── Composant ligne de détail ─────────────────────────────────────────────────
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -119,7 +121,7 @@ function BuyPanel() {
     try {
       setTxState("pending");
       setStep("approving");
-      await writeContractAsync({
+      const approveTx = await writeContractAsync({
         address: usdcAddress as `0x${string}`,
         abi: [{ name: "approve", type: "function", stateMutability: "nonpayable",
           inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }],
@@ -127,6 +129,7 @@ function BuyPanel() {
         functionName: "approve",
         args: [exchange.address, usdcParsed],
       });
+      await waitForTransactionReceipt(wagmiConfig, { hash: approveTx });
       setStep("buying");
       setTxState("confirming");
       const buyTx = await writeContractAsync({
