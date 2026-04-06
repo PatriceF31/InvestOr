@@ -80,6 +80,9 @@ contract Reserve is
     /// @dev Résultat du dernier check
     bool public lastCheckHealthy;
 
+    /// @notice Adresses autorisées à recapitaliser (en plus du owner)
+    mapping(address => bool) public recapitalizers;
+
     // ─── Events ──────────────────────────────────────────────────────────────
 
     event ReserveChecked(
@@ -102,6 +105,8 @@ contract Reserve is
     event MinRatioUpdated(uint256 oldRatio, uint256 newRatio);
     event OracleMaxAgeUpdated(uint256 oldMaxAge, uint256 newMaxAge);
     event OracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event RecapitalizerAdded(address indexed account);
+    event RecapitalizerRemoved(address indexed account);
 
     // ─── Errors ──────────────────────────────────────────────────────────────
 
@@ -279,10 +284,16 @@ contract Reserve is
 
     // ─── Recapitalisation ─────────────────────────────────────────────────────
 
+    modifier onlyRecapitalizerOrOwner() {
+        if (msg.sender != owner() && !recapitalizers[msg.sender])
+            revert OwnableUnauthorizedAccount(msg.sender);
+        _;
+    }  
+     
     /// @notice Injecte des USDC dans le Treasury pour restaurer le ratio
     /// @dev Réservé au owner — l'appelant doit avoir approuvé usdc.approve(reserve, amount)
     /// @param amount Montant USDC à injecter
-    function recapitalize(uint256 amount) external onlyOwner {
+    function recapitalize(uint256 amount) external onlyRecapitalizerOrOwner {
         if (amount == 0) revert ZeroAmount();
 
         address usdcAddr = treasury.usdc();
@@ -353,6 +364,19 @@ contract Reserve is
         IExchange(address(exchange)).setFallbackPrice(newPrice);
     }
 
+    /// @notice Ajoute un recapitalisateur autorisé
+    function addRecapitalizer(address account) external onlyOwner {
+        if (account == address(0)) revert ZeroAddress();
+        recapitalizers[account] = true;
+        emit RecapitalizerAdded(account);
+    }
+
+    /// @notice Retire un recapitalisateur
+    function removeRecapitalizer(address account) external onlyOwner {
+        recapitalizers[account] = false;
+        emit RecapitalizerRemoved(account);
+    }
+
     // ─── UUPS ────────────────────────────────────────────────────────────────
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -361,5 +385,5 @@ contract Reserve is
 
     /// @dev Variables : gld(1)+treasury(1)+exchange(1)+oracle(1)+minRatioBps(1)
     /// @dev   +oracleMaxAge(1)+lastCheckAt(1)+lastCheckHealthy(1) = 8 slots
-    uint256[42] private __gap;
+    uint256[41] private __gap;
 }
