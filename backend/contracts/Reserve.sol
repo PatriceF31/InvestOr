@@ -337,6 +337,12 @@ contract Reserve is
         IExchange(address(exchange)).transferOwnership(newOwner);
     }
 
+    /// @notice Met à jour l'adresse de l'Exchange dans le storage
+    function setExchange(address newExchange) external onlyOwner {
+        if (newExchange == address(0)) revert ZeroAddress();
+        exchange = IExchange(newExchange);
+    }
+
     /// @notice Met à jour l'oracle de l'Exchange
     function setExchangeOracle(address newOracle) external onlyOwner {
         IExchange(address(exchange)).setOracle(newOracle);
