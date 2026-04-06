@@ -31,6 +31,15 @@ export default function ReservePage() {
   const { data: ownerAddress } = useReadContract({ ...gld, functionName: "owner" });
   const isOwner = isConnected && address !== undefined && ownerAddress !== undefined &&
     address.toLowerCase() === (ownerAddress as string).toLowerCase();
+  // Vérifier si l'adresse connectée est recapitalisatrice
+  const { data: isRecapitalizer } = useReadContract({
+    ...reserve,
+    functionName: "recapitalizers",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const canRecapitalize = isOwner || !!isRecapitalizer;
   const [mounted, setMounted] = useState(false);
   const [recapAmount, setRecapAmount] = useState("");
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
@@ -220,7 +229,7 @@ export default function ReservePage() {
         </div>
 
         {/* Recapitaliser — admin uniquement */}
-        {isOwner && <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+        {canRecapitalize && <div className="rounded-xl border border-border bg-card p-6 space-y-4">
           <div>
             <h3 className="font-semibold">{t("recapitalize")}</h3>
             <p className="text-sm text-muted-foreground mt-1">
