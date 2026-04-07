@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Sun, Moon, Globe } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAccount, useReadContract } from "wagmi";
@@ -26,7 +26,14 @@ const ADMIN_LINKS = [
 export default function Navbar() {
   const t = useTranslations("nav");
   const router = useRouter();
-  const { locale, pathname, query, asPath } = router;
+  const { query, asPath } = router;
+  const locale = useLocale();
+  const toggleLocale = () => {
+    const next = locale === "fr" ? "pt" : "fr";
+    const currentPath = asPath.replace(/^\/[a-z]{2}/, "") || "/";
+    document.cookie = `NEXT_LOCALE=${next};path=/;max-age=31536000`;
+    window.location.href = `/${next}${currentPath}`;
+  };
   const [dark, setDark] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { address, isConnected } = useAccount();
@@ -65,13 +72,8 @@ export default function Navbar() {
     localStorage.setItem("theme", next ? "dark" : "light");
   };
 
-  const toggleLocale = () => {
-    const next = locale === "fr" ? "pt" : "fr";
-    router.push({ pathname, query }, asPath, { locale: next });
-  };
-
   const isActive = (href: string) => {
-    const current = pathname.replace(/^\/[a-z]{2}/, "") || "/";
+    const current = asPath.replace(/^\/[a-z]{2}/, "") || "/";
     return current === href;
   };
 

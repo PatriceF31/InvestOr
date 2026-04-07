@@ -24,9 +24,12 @@ export function useDashboard() {
         ...gld,
         functionName: "totalSupply",
       },
-      // 2 — Balance USDC déposée par l'utilisateur dans Treasury
+      // 2 — Balance USDC du wallet (lecture directe sur le contrat USDC)
       {
-        ...treasury,
+        address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+        abi: [{ name: "balanceOf", type: "function", stateMutability: "view",
+          inputs: [{ name: "account", type: "address" }],
+          outputs: [{ name: "", type: "uint256" }] }] as const,
         functionName: "balanceOf",
         args: address ? [address] : undefined,
       },

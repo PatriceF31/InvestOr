@@ -97,7 +97,7 @@ export default function DashboardPage() {
           icon={Wallet}
           label={t("balance_usdc")}
           value={`${formatted.usdcBalance} USDC`}
-          sub="Déposé dans Treasury"
+          sub="Dans votre wallet"
         />
         <StatCard
           icon={TrendingUp}
