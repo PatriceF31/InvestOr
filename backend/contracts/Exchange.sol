@@ -67,6 +67,8 @@ contract Exchange is
     /// @dev Adresse de collecte des fees
     address public feeCollector;
 
+    uint256 public constant BASIS_POINTS = 10_000;
+
     // ─── Events ──────────────────────────────────────────────────────────────
 
     event TokensBought(address indexed buyer, uint256 usdcAmount, uint256 gldAmount, uint256 price);
@@ -190,11 +192,18 @@ contract Exchange is
         // 1. Transfert USDC user → Exchange
         usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);
 
-        // 2. Dépôt USDC dans Treasury (approve + deposit)
-        usdc.forceApprove(address(treasury), usdcAmount);
-        treasury.deposit(usdcAmount);
+        // 2. Calcul et transfert des frais
+        uint256 feeAmount = (usdcAmount * feeBps) / BASIS_POINTS;
+        uint256 netAmount = usdcAmount - feeAmount;
+        if (feeAmount > 0 && feeCollector != address(0)) {
+            usdc.safeTransfer(feeCollector, feeAmount);
+        }
 
-        // 3. Mint GLD pour l'utilisateur
+        // 3. Dépôt USDC net dans Treasury
+        usdc.forceApprove(address(treasury), netAmount);
+        treasury.deposit(netAmount);
+
+        // 4. Mint GLD pour l'utilisateur
         gld.mint(msg.sender, gldAmount);
 
         emit TokensBought(msg.sender, usdcAmount, gldAmount, price);
@@ -212,11 +221,19 @@ contract Exchange is
 
         (uint256 price,) = getPrice();
 
-        // 1. Burn GLD de l'utilisateur
+        // 1. Calcul des frais
+        uint256 feeAmount = (usdcAmount * feeBps) / BASIS_POINTS;
+        uint256 netAmount = usdcAmount - feeAmount;
+
+        // 2. Burn GLD de l'utilisateur
         gld.burn(msg.sender, gldAmount);
 
-        // 2. Retrait USDC depuis Treasury directement vers l'utilisateur
-        treasury.operatorWithdraw(msg.sender, usdcAmount);
+        // 3. Retrait USDC depuis Treasury
+        // Frais vers feeCollector, net vers l'utilisateur
+        if (feeAmount > 0 && feeCollector != address(0)) {
+            treasury.operatorWithdraw(feeCollector, feeAmount);
+        }
+        treasury.operatorWithdraw(msg.sender, netAmount);
 
         emit TokensSold(msg.sender, gldAmount, usdcAmount, price);
     }

@@ -41,6 +41,8 @@ interface IExchange {
     function setFallbackPrice(uint256 newPrice) external;
     function transferOwnership(address newOwner) external;
     function setTreasury(address newTreasury) external;
+    function setFeeBps(uint256 newFeeBps) external;
+    function setFeeCollector(address newCollector) external;
 }
 
 /// @title Reserve — Surveillance et Proof of Reserve du protocole InvestOr
@@ -289,7 +291,7 @@ contract Reserve is
             revert OwnableUnauthorizedAccount(msg.sender);
         _;
     }  
-     
+
     /// @notice Injecte des USDC dans le Treasury pour restaurer le ratio
     /// @dev Réservé au owner — l'appelant doit avoir approuvé usdc.approve(reserve, amount)
     /// @param amount Montant USDC à injecter
@@ -316,6 +318,11 @@ contract Reserve is
     }
 
     // ─── Admin ───────────────────────────────────────────────────────────────
+
+    /// @notice Upgrade l'implémentation de l'Exchange
+    function upgradeExchange(address newImpl) external onlyOwner {
+        UUPSUpgradeable(address(exchange)).upgradeToAndCall(newImpl, "");
+    }
 
     /// @notice Met à jour le ratio minimum de collatéralisation
     /// @param newRatioBps Nouveau ratio en bps (ex: 11000 = 110%)
@@ -362,6 +369,16 @@ contract Reserve is
     /// @notice Met à jour le prix fallback de l'Exchange
     function setExchangeFallbackPrice(uint256 newPrice) external onlyOwner {
         IExchange(address(exchange)).setFallbackPrice(newPrice);
+    }
+
+    /// @notice Met à jour les frais de l'Exchange (en basis points)
+    function setExchangeFeeBps(uint256 newFeeBps) external onlyOwner {
+        IExchange(address(exchange)).setFeeBps(newFeeBps);
+    }
+
+    /// @notice Met à jour le collecteur de frais de l'Exchange
+    function setExchangeFeeCollector(address newCollector) external onlyOwner {
+        IExchange(address(exchange)).setFeeCollector(newCollector);
     }
 
     /// @notice Ajoute un recapitalisateur autorisé

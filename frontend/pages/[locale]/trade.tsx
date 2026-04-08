@@ -71,6 +71,11 @@ function BuyPanel() {
   const [txState, setTxState] = useState<TxState>("idle");
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
     useWaitForTransactionReceipt({ hash: txHash });
+  const { data: feeBps } = useReadContract({
+    ...exchange,
+    functionName: "feeBps",
+  });
+  const feePercent = feeBps !== undefined ? (Number(feeBps) / 100).toFixed(2) + "%" : "0%";
 
   // Prix actuel
   const { data: priceRaw } = useReadContract({
@@ -214,7 +219,7 @@ function BuyPanel() {
           label="Source prix"
           value={isOracle ? "Chainlink Oracle" : "Prix fallback"}
         />
-        <DetailRow label="Frais" value="0%" />
+        <DetailRow label="Frais" value={feePercent} />
         <DetailRow
           label="Étape 1"
           value={step === "approving" ? "✓ Approbation USDC..." : "Approbation USDC"}
@@ -262,6 +267,11 @@ function SellPanel() {
   const [txState, setTxState] = useState<TxState>("idle");
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
     useWaitForTransactionReceipt({ hash: txHash });
+  const { data: feeBps } = useReadContract({
+    ...exchange,
+    functionName: "feeBps",
+  });
+  const feePercent = feeBps !== undefined ? (Number(feeBps) / 100).toFixed(2) + "%" : "0%";
 
   // Prix actuel
   const { data: priceRaw } = useReadContract({
@@ -379,7 +389,7 @@ function SellPanel() {
           label="Source prix"
           value={isOracle ? "Chainlink Oracle" : "Prix fallback"}
         />
-        <DetailRow label="Frais" value="0%" />
+        <DetailRow label="Frais" value={feePercent} />
       </div>
 
       {/* Statut tx */}

@@ -47,6 +47,8 @@ export default function AdminPage() {
   const [emergencyTo,   setEmergencyTo]   = useState("");
   const [recapAddr,     setRecapAddr]     = useState("");
   const [removeRecapAddr, setRemoveRecapAddr] = useState("");
+  const [feeBps,        setFeeBps]        = useState("");
+  const [feeCollector,  setFeeCollector]  = useState("");
 
   const { writeContractAsync, isPending } = useWriteContract();
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
@@ -216,6 +218,30 @@ export default function AdminPage() {
           </div>
         </ActionRow>
       </AdminCard>
+      <Separator />
+        <ActionRow label="Frais (bps, ex: 50 = 0.5%, 0 = gratuit)">
+          <div className="flex gap-2">
+            <Input type="number" placeholder="0" value={feeBps} onChange={e => setFeeBps(e.target.value)} />
+            <Button disabled={feeBps === "" || isLoading}
+              onClick={() => exec(() => writeContractAsync({
+                ...reserve, functionName: "setExchangeFeeBps", args: [BigInt(feeBps)]
+              }))}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "OK"}
+            </Button>
+          </div>
+        </ActionRow>
+        <Separator />
+        <ActionRow label="Collecteur de frais">
+          <div className="flex gap-2">
+            <Input placeholder="0x..." value={feeCollector} onChange={e => setFeeCollector(e.target.value)} className="font-mono text-sm" />
+            <Button disabled={!feeCollector || isLoading}
+              onClick={() => exec(() => writeContractAsync({
+                ...reserve, functionName: "setExchangeFeeCollector", args: [feeCollector as `0x${string}`]
+              }))}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "OK"}
+            </Button>
+          </div>
+        </ActionRow>
 
       {/* Reserve */}
       <AdminCard title="Reserve">
