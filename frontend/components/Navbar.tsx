@@ -30,7 +30,7 @@ export default function Navbar() {
   const locale = useLocale();
   const toggleLocale = () => {
     const next = locale === "fr" ? "pt" : "fr";
-    const currentPath = asPath.replace(/^\/[a-z]{2}/, "") || "/";
+    const currentPath = asPath.replace(/^\/[a-z]{2}(\/|$)/, "/") || "/";
     document.cookie = `NEXT_LOCALE=${next};path=/;max-age=31536000`;
     window.location.href = `/${next}${currentPath}`;
   };

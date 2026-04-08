@@ -474,8 +474,8 @@ export default function TradePage() {
   );
 }
 
-export async function getStaticProps({ locale }: GetStaticPropsContext) {
-  const safeLocale = locale ?? "fr";
+export async function getStaticProps({ params }: GetStaticPropsContext) {
+  const safeLocale = (params?.locale as string) ?? "fr";
   const messages = (await import(`@/messages/${safeLocale}.json`)).default;
   return { props: { locale: safeLocale, messages } };
 }
