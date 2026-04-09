@@ -6,7 +6,13 @@
     "history": "Histórico",
     "reserve": "Reserva",
     "admin": "Administração",
-    "price": "Preço do ouro"
+    "price": "Preço do ouro",
+    "connect_wallet_hint": "Conecte a sua carteira para ver os seus dados",
+    "in_your_wallet": "Na sua carteira",
+    "global_stats": "Estatísticas globais",
+    "grams_tokenized": "gramas tokenizados",
+    "total_deposited": "Total depositado no Treasury",
+    "market_value": "Valor de mercado dos GLD"
   },
   "dashboard": {
     "title": "Painel",
@@ -30,7 +36,17 @@
     "confirm": "Confirmar",
     "preview": "Pré-visualizar",
     "price_per_gram": "Preço / grama",
-    "slippage": "Derrapagem máx."
+    "slippage": "Derrapagem máx.",
+    "price_source": "Fonte do preço",
+    "oracle_price": "Chainlink Oracle",
+    "fallback_price": "Preço fallback",
+    "step1": "Aprovação USDC",
+    "step1_pending": "✓ Aprovação USDC...",
+    "step2": "Compra GLD",
+    "step2_pending": "✓ Compra GLD...",
+    "connect_to_buy": "Conecte a sua carteira para comprar",
+    "connect_to_sell": "Conecte a sua carteira para vender",
+    "fees": "Taxas"
   },
   "deposit": {
     "title": "Depósito / Levantamento USDC",
@@ -61,7 +77,12 @@
     "price": "Preço",
     "date": "Data",
     "filter_all": "Todas",
-    "no_history": "Nenhuma operação"
+    "no_history": "Nenhuma operação",
+    "buy": "Compra GLD",
+    "sell": "Venda GLD",
+    "deposit": "Depósito USDC",
+    "withdraw": "Retirada USDC",
+    "connect_hint": "Conecte a sua carteira"
   },
   "admin": {
     "title": "Administração",
@@ -73,7 +94,8 @@
     "pause_exchange": "Pausar Exchange",
     "unpause_exchange": "Retomar Exchange",
     "blacklist": "Blacklist",
-    "emergency_withdraw": "Levantamento de emergência"
+    "emergency_withdraw": "Levantamento de emergência",
+    "connect_hint": "Conecte a sua carteira para aceder à administração."
   },
   "common": {
     "connect_wallet": "Conectar carteira",

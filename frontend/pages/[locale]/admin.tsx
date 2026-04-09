@@ -74,7 +74,7 @@ export default function AdminPage() {
     return (
       <div className="max-w-2xl mx-auto text-center py-16 space-y-4">
         <Settings className="h-12 w-12 mx-auto text-muted-foreground" />
-        <p className="text-muted-foreground">Connectez votre portefeuille pour accéder à l'administration.</p>
+        <p className="text-muted-foreground">{t("connect_hint")}</p>
       </div>
     );
   }

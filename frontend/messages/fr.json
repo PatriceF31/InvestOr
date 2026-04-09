@@ -16,7 +16,13 @@
     "reserve_ratio": "Ratio de réserve",
     "per_gram": "par gramme",
     "healthy": "Sain",
-    "at_risk": "En risque"
+    "at_risk": "En risque",
+    "connect_wallet_hint": "Connectez votre portefeuille pour voir vos données",
+    "in_your_wallet": "Dans votre wallet",
+    "global_stats": "Statistiques globales",
+    "grams_tokenized": "grammes tokenisés",
+    "total_deposited": "Total déposé dans Treasury",
+    "market_value": "Valeur marchande des GLD"
   },
   "trade": {
     "title": "Acheter / Vendre GLD",
@@ -30,7 +36,17 @@
     "confirm": "Confirmer",
     "preview": "Aperçu",
     "price_per_gram": "Prix / gramme",
-    "slippage": "Glissement max"
+    "slippage": "Glissement max",
+    "price_source": "Source prix",
+    "oracle_price": "Chainlink Oracle",
+    "fallback_price": "Prix fallback",
+    "step1": "Approbation USDC",
+    "step1_pending": "✓ Approbation USDC...",
+    "step2": "Achat GLD",
+    "step2_pending": "✓ Achat GLD...",
+    "connect_to_buy": "Connectez votre portefeuille pour acheter",
+    "connect_to_sell": "Connectez votre portefeuille pour vendre",
+    "fees": "Frais"
   },
   "deposit": {
     "title": "Dépôt / Retrait USDC",
@@ -61,7 +77,12 @@
     "price": "Prix",
     "date": "Date",
     "filter_all": "Toutes",
-    "no_history": "Aucune opération"
+    "no_history": "Aucune opération",
+    "buy": "Achat GLD",
+    "sell": "Vente GLD",
+    "deposit": "Dépôt USDC",
+    "withdraw": "Retrait USDC",
+    "connect_hint": "Connectez votre portefeuille"
   },
   "admin": {
     "title": "Administration",
@@ -73,7 +94,8 @@
     "pause_exchange": "Pauser Exchange",
     "unpause_exchange": "Reprendre Exchange",
     "blacklist": "Blacklister",
-    "emergency_withdraw": "Retrait d'urgence"
+    "emergency_withdraw": "Retrait d'urgence",
+    "connect_hint": "Connectez votre portefeuille pour accéder à l'administration."
   },
   "common": {
     "connect_wallet": "Connecter le portefeuille",

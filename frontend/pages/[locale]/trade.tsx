@@ -215,19 +215,10 @@ function BuyPanel() {
       {/* Détails */}
       <div className="space-y-2">
         <DetailRow label={t("price_per_gram")} value={priceStr} />
-        <DetailRow
-          label="Source prix"
-          value={isOracle ? "Chainlink Oracle" : "Prix fallback"}
-        />
-        <DetailRow label="Frais" value={feePercent} />
-        <DetailRow
-          label="Étape 1"
-          value={step === "approving" ? "✓ Approbation USDC..." : "Approbation USDC"}
-        />
-        <DetailRow
-          label="Étape 2"
-          value={step === "buying" ? "✓ Achat GLD..." : "Achat GLD"}
-        />
+        <DetailRow label={t("price_source")} value={isOracle ? t("oracle_price") : t("fallback_price")} />
+        <DetailRow label={t("fee")} value={feePercent} />
+        <DetailRow label={t("step1")} value={step === "approving" ? t("step1_pending") : t("step1")} />
+        <DetailRow label={t("step2")} value={step === "buying" ? t("step2_pending") : t("step2")} />
       </div>
 
       {/* Statut tx */}
@@ -248,7 +239,7 @@ function BuyPanel() {
 
       {!address && (
         <p className="text-center text-sm text-muted-foreground">
-          Connectez votre portefeuille pour acheter
+          {t("connect_to_buy")}
         </p>
       )}
     </div>
@@ -385,11 +376,8 @@ function SellPanel() {
       {/* Détails */}
       <div className="space-y-2">
         <DetailRow label={t("price_per_gram")} value={priceStr} />
-        <DetailRow
-          label="Source prix"
-          value={isOracle ? "Chainlink Oracle" : "Prix fallback"}
-        />
-        <DetailRow label="Frais" value={feePercent} />
+        <DetailRow label={t("price_source")} value={isOracle ? t("oracle_price") : t("fallback_price")} />
+        <DetailRow label={t("fee")} value={feePercent} />
       </div>
 
       {/* Statut tx */}
@@ -411,7 +399,7 @@ function SellPanel() {
 
       {!address && (
         <p className="text-center text-sm text-muted-foreground">
-          Connectez votre portefeuille pour vendre
+          {t("connect_to_sell")}
         </p>
       )}
     </div>

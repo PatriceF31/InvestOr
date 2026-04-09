@@ -22,29 +22,24 @@ type LogEntry = {
   timestamp?: number;
 };
 
-const ACTION_CONFIG = {
-  BUY:        { label: "Achat GLD",      icon: TrendingUp,      color: "text-green-500",  bg: "bg-green-500/10" },
-  SELL:       { label: "Vente GLD",      icon: TrendingDown,    color: "text-red-500",    bg: "bg-red-500/10" },
-  DEPOSIT:    { label: "Dépôt USDC",     icon: ArrowDownToLine, color: "text-blue-500",   bg: "bg-blue-500/10" },
-  WITHDRAWAL: { label: "Retrait USDC",   icon: ArrowUpFromLine, color: "text-orange-500", bg: "bg-orange-500/10" },
-};
-
 // ── Composant ligne ───────────────────────────────────────────────────────────
-function EntryRow({ entry }: { entry: LogEntry }) {
-  const config = ACTION_CONFIG[entry.type];
-  const Icon   = config.icon;
+function EntryRow({ entry, config }: { 
+  entry: LogEntry; 
+  config: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; color: string; bg: string }> 
+}) {
+  const cfg = config[entry.type];
+  const Icon = cfg.icon as React.FC<{ className?: string }>;
   const isUSDC = entry.type === "DEPOSIT" || entry.type === "WITHDRAWAL";
-  const isGLD  = entry.type === "BUY"     || entry.type === "SELL";
   const decimals = isUSDC ? 6 : 3;
   const symbol   = isUSDC ? "USDC" : "GLD";
 
   return (
     <div className="flex items-center gap-4 py-3 border-b border-border last:border-0">
-      <div className={`p-2 rounded-lg ${config.bg} ${config.color} shrink-0`}>
+    <div className={`p-2 rounded-lg ${cfg.bg} ${cfg.color} shrink-0`}>
         <Icon className="h-4 w-4" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm">{config.label}</p>
+        <p className="font-medium text-sm">{cfg.label}</p>
         <p className="text-xs text-muted-foreground font-mono truncate">
           {entry.address.slice(0, 6)}...{entry.address.slice(-4)}
         </p>
@@ -95,6 +90,13 @@ export default function HistoryPage() {
   const [mounted, setMounted] = useState(false);
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const ACTION_CONFIG = {
+    BUY:        { label: t("buy"),      icon: TrendingUp,      color: "text-green-500",  bg: "bg-green-500/10" },
+    SELL:       { label: t("sell"),     icon: TrendingDown,    color: "text-red-500",    bg: "bg-red-500/10" },
+    DEPOSIT:    { label: t("deposit"),  icon: ArrowDownToLine, color: "text-blue-500",   bg: "bg-blue-500/10" },
+    WITHDRAWAL: { label: t("withdraw"), icon: ArrowUpFromLine, color: "text-orange-500", bg: "bg-orange-500/10" },
+  };
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -222,7 +224,7 @@ export default function HistoryPage() {
           <p>{t("no_history")}</p>
         </div>
       ) : (
-        list.slice(0, 50).map((entry, i) => <EntryRow key={i} entry={entry} />)
+        list.slice(0, 50).map((entry, i) => <EntryRow key={i} entry={entry} config={ACTION_CONFIG} />)
       )}
     </div>
   );
@@ -260,7 +262,7 @@ export default function HistoryPage() {
         <TabsContent value="mine">
           {!address ? (
             <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
-              Connectez votre portefeuille
+              {t("connect_hint")}
             </div>
           ) : (
             <EntriesList list={userEntries} />

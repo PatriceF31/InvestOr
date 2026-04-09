@@ -66,7 +66,7 @@ export default function DashboardPage() {
           <p className="text-muted-foreground mt-1 text-sm">
             {isConnected
               ? `${address?.slice(0, 6)}...${address?.slice(-4)}`
-              : "Connectez votre portefeuille pour voir vos données"
+              : t("connect_wallet_hint")
             }
           </p>
         </div>
@@ -97,7 +97,7 @@ export default function DashboardPage() {
           icon={Wallet}
           label={t("balance_usdc")}
           value={`${formatted.usdcBalance} USDC`}
-          sub="Dans votre wallet"
+          sub={t("in_your_wallet")}
         />
         <StatCard
           icon={TrendingUp}
@@ -121,17 +121,17 @@ export default function DashboardPage() {
 
       {/* Stats globales */}
       <div>
-        <h2 className="text-lg font-semibold mb-4">Statistiques globales</h2>
+        <h2 className="text-lg font-semibold mb-4">{t("global_stats")}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
             <p className="text-xs text-muted-foreground">GLD en circulation</p>
             <p className="text-lg font-semibold">{formatted.gldSupply} GLD</p>
-            <p className="text-xs text-muted-foreground">{Number(formatted.gldSupply !== "—" ? formatted.gldSupply : 0).toFixed(3)} grammes tokenisés</p>
+            <p className="text-xs text-muted-foreground">{Number(formatted.gldSupply !== "—" ? formatted.gldSupply : 0).toFixed(3)} {t("grams_tokenized")}</p>
           </div>
           <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
             <p className="text-xs text-muted-foreground">USDC en réserve</p>
             <p className="text-lg font-semibold">{formatted.usdcTotal} USDC</p>
-            <p className="text-xs text-muted-foreground">Total déposé dans Treasury</p>
+            <p className="text-xs text-muted-foreground">{t("total_deposited")}</p>
           </div>
           <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
             <p className="text-xs text-muted-foreground">Valeur or (USDC)</p>
@@ -141,7 +141,7 @@ export default function DashboardPage() {
                 : "—"
               }
             </p>
-            <p className="text-xs text-muted-foreground">Valeur marchande des GLD</p>
+            <p className="text-xs text-muted-foreground">{t("market_value")}</p>
           </div>
         </div>
       </div>
