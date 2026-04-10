@@ -95,7 +95,7 @@ export default function Navbar() {
             {NAV_LINKS.map(({ key, href }) => (
               <Link
                 key={key}
-                href={href}
+                href={`/${locale}${href}`}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   isActive(href)
                     ? "bg-primary text-primary-foreground"
@@ -150,7 +150,7 @@ export default function Navbar() {
           {NAV_LINKS.map(({ key, href }) => (
             <Link
               key={key}
-              href={href}
+              href={`/${locale}${href}`}
               className={`shrink-0 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 isActive(href)
                   ? "bg-primary text-primary-foreground"

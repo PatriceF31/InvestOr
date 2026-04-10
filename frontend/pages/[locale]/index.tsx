@@ -73,7 +73,7 @@ export default function DashboardPage() {
         {isConnected && (
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            Rafraîchir
+            {t("refresh")}
           </Button>
         )}
       </div>
@@ -124,17 +124,17 @@ export default function DashboardPage() {
         <h2 className="text-lg font-semibold mb-4">{t("global_stats")}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
-            <p className="text-xs text-muted-foreground">GLD en circulation</p>
+            <p className="text-xs text-muted-foreground">{t("gld_supply_title")}</p>
             <p className="text-lg font-semibold">{formatted.gldSupply} GLD</p>
             <p className="text-xs text-muted-foreground">{Number(formatted.gldSupply !== "—" ? formatted.gldSupply : 0).toFixed(3)} {t("grams_tokenized")}</p>
           </div>
           <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
-            <p className="text-xs text-muted-foreground">USDC en réserve</p>
+            <p className="text-xs text-muted-foreground">{t("usdc_reserve_title")}</p>
             <p className="text-lg font-semibold">{formatted.usdcTotal} USDC</p>
             <p className="text-xs text-muted-foreground">{t("total_deposited")}</p>
           </div>
           <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
-            <p className="text-xs text-muted-foreground">Valeur or (USDC)</p>
+            <p className="text-xs text-muted-foreground">{t("gold_value_title")}</p>
             <p className="text-lg font-semibold">
               {reserve.goldValueUsdc !== undefined
                 ? `${parseFloat((Number(reserve.goldValueUsdc) / 1e6).toFixed(2))} USDC`

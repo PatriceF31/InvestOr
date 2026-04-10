@@ -22,7 +22,11 @@
     "global_stats": "Statistiques globales",
     "grams_tokenized": "grammes tokenisés",
     "total_deposited": "Total déposé dans Treasury",
-    "market_value": "Valeur marchande des GLD"
+    "market_value": "Valeur marchande des GLD",
+    "gld_supply_title": "GLD en circulation",
+    "usdc_reserve_title": "USDC en réserve",
+    "gold_value_title": "Valeur or (USDC)",
+    "refresh": "Rafraîchir"
   },
   "trade": {
     "title": "Acheter / Vendre GLD",

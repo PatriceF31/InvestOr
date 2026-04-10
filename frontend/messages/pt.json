@@ -14,7 +14,7 @@
     "total_deposited": "Total depositado no Treasury",
     "market_value": "Valor de mercado dos GLD"
   },
-  "dashboard": {
+"dashboard": {
     "title": "Painel",
     "balance_gld": "Saldo GLD",
     "balance_usdc": "Saldo USDC",
@@ -22,7 +22,17 @@
     "reserve_ratio": "Rácio de reserva",
     "per_gram": "por grama",
     "healthy": "Saudável",
-    "at_risk": "Em risco"
+    "at_risk": "Em risco",
+    "connect_wallet_hint": "Conecte a sua carteira para ver os seus dados",
+    "in_your_wallet": "Na sua carteira",
+    "global_stats": "Estatísticas globais",
+    "grams_tokenized": "gramas tokenizados",
+    "total_deposited": "Total depositado no Treasury",
+    "market_value": "Valor de mercado dos GLD",
+    "gld_supply_title": "GLD em circulação",
+    "usdc_reserve_title": "USDC em reserva",
+    "gold_value_title": "Valor ouro (USDC)",
+    "refresh": "Atualizar"
   },
   "trade": {
     "title": "Comprar / Vender GLD",
