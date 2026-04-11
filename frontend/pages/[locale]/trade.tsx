@@ -161,7 +161,7 @@ function BuyPanel() {
         <div className="flex items-center justify-between">
           <Label>{t("amount_usdc")}</Label>
           <span className="text-xs text-muted-foreground">
-            Solde : {balanceStr} USDC
+            {t("balance")} : {balanceStr} USDC
           </span>
         </div>
         <div className="relative">
@@ -326,7 +326,7 @@ function SellPanel() {
         <div className="flex items-center justify-between">
           <Label>{t("amount_gld")}</Label>
           <span className="text-xs text-muted-foreground">
-            Solde : {balanceStr} GLD
+            {t("balance")} : {balanceStr} GLD
           </span>
         </div>
         <div className="relative">
@@ -429,9 +429,7 @@ export default function TradePage() {
           <TrendingUp className="h-6 w-6 text-primary" />
           <h1 className="text-3xl font-bold">{t("title")}</h1>
         </div>
-        <p className="text-muted-foreground text-sm">
-          1 GLD = 1 gramme d'or physique tokenisé
-        </p>
+        <p className="text-muted-foreground text-sm">{t("sub-title")}</p>
         {exchangePaused && (
           <Badge variant="destructive">Exchange pausé</Badge>
         )}
@@ -454,10 +452,7 @@ export default function TradePage() {
       </div>
 
       {/* Note légale */}
-      <p className="text-center text-xs text-muted-foreground px-4">
-        Les transactions sont irréversibles. Vérifiez les montants avant de confirmer.
-        Le prix est fourni par Chainlink Oracle.
-      </p>
+      <p className="text-center text-xs text-muted-foreground px-4">{t("irreversible_trade")}</p>
     </div>
   );
 }

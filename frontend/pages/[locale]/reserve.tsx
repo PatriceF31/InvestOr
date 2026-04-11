@@ -131,7 +131,7 @@ export default function ReservePage() {
           <Shield className="h-7 w-7 text-primary" />
           <div>
             <h1 className="text-3xl font-bold">{t("title")}</h1>
-            <p className="text-muted-foreground text-sm">Preuve de collatéralisation on-chain</p>
+            <p className="text-muted-foreground text-sm">{t("sub_title")}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -149,12 +149,12 @@ export default function ReservePage() {
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 flex items-start gap-3">
           <TrendingDown className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
           <div className="space-y-1">
-            <p className="font-semibold text-destructive">Déficit de collatéral détecté</p>
+            <p className="font-semibold text-destructive">{t("collateral_deficit")}</p>
             <p className="text-sm text-destructive/80">
-              Déficit : {formatUnits(deficitUsdc, 6)} USDC à injecter pour restaurer le ratio minimum.
+              {t("deficit")} : {formatUnits(deficitUsdc, 6)} {t("inject_usdc")}
             </p>
             {exchangePaused && (
-              <p className="text-sm font-medium text-destructive">⚠️ L'Exchange a été automatiquement pausé.</p>
+              <p className="text-sm font-medium text-destructive">⚠️ {t("exchange_paused")}</p>
             )}
           </div>
         </div>
@@ -167,7 +167,7 @@ export default function ReservePage() {
           <p className={`text-4xl font-bold ${healthy ? "text-primary" : "text-destructive"}`}>
             {ratioPercent}%
           </p>
-          <p className="text-xs text-muted-foreground">Min requis : {minRatioPercent}%</p>
+          <p className="text-xs text-muted-foreground">{t("min_required")} : {minRatioPercent}%</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5 space-y-2 text-center">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">{t("usdc_reserve")}</p>
@@ -187,11 +187,11 @@ export default function ReservePage() {
 
       {/* Détails */}
       <div className="rounded-xl border border-border bg-card p-6 space-y-1">
-        <h2 className="font-semibold mb-3">Détails</h2>
+        <h2 className="font-semibold mb-3">{t("details")}</h2>
         <Separator className="mb-3" />
         <DetailRow label={t("gld_supply")}
           value={gldSupply !== undefined ? `${formatUnits(gldSupply, 3)} GLD` : "—"} />
-        <DetailRow label="Prix or"
+        <DetailRow label={t("gold_price")}
           value={price !== undefined ? `$${(Number(price) / 1e8).toFixed(2)} / g` : "—"}
           highlight />
         <DetailRow label={t("usdc_reserve")}
@@ -200,7 +200,7 @@ export default function ReservePage() {
           value={goldValueUsdc !== undefined ? `${formatUnits(goldValueUsdc, 6)} USDC` : "—"} />
         <DetailRow label={t("ratio")} value={`${ratioPercent}%`} highlight />
         <DetailRow label={t("min_ratio")} value={`${minRatioPercent}%`} />
-        <DetailRow label="Exchange" value={exchangePaused ? "⚠️ Pausé" : "✓ Actif"} />
+        <DetailRow label="Exchange" value={exchangePaused ? `⚠️ ${t("paused")}` : `✓ ${t("active")}`} /  >
       </div>
 
       {/* Actions */}
@@ -209,21 +209,18 @@ export default function ReservePage() {
         <div className="rounded-xl border border-border bg-card p-6 space-y-4">
           <div>
             <h3 className="font-semibold">{t("proof_of_reserve")}</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Vérifie le ratio et pause Exchange si insuffisant.
-              Appelable par n'importe qui.
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">{t("check_ratio")}</p>
           </div>
           <Button className="w-full" onClick={handleProofOfReserve}
             disabled={isLoading2}>
             {isLoading2
-              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />En cours...</>
+              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t("in_progress")}</>
               : <><RefreshCw className="h-4 w-4 mr-2" />{t("proof_of_reserve")}</>
             }
           </Button>
           {isConfirmed && (
             <p className="text-xs text-green-600 flex items-center gap-1">
-              <CheckCircle className="h-3 w-3" /> Vérification effectuée
+              <CheckCircle className="h-3 w-3" /> {t("verification")}
             </p>
           )}
         </div>
@@ -233,10 +230,10 @@ export default function ReservePage() {
           <div>
             <h3 className="font-semibold">{t("recapitalize")}</h3>
             <p className="text-sm text-muted-foreground mt-1">
-              Injecter des USDC pour restaurer le ratio.
+              {t("inject_usdc0")}
               {deficitUsdc !== undefined && deficitUsdc > 0n && (
                 <span className="text-destructive font-medium">
-                  {" "}Déficit : {formatUnits(deficitUsdc, 6)} USDC
+                  {" "}{t("deficit")} : {formatUnits(deficitUsdc, 6)} USDC
                 </span>
               )}
             </p>
@@ -256,7 +253,7 @@ export default function ReservePage() {
             onClick={handleRecapitalize}
             disabled={!recapAmount || Number(recapAmount) <= 0 || isLoading2 || !address}>
             {isLoading2
-              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />En cours...</>
+              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t("in_progress")}</>
               : t("recapitalize")
             }
           </Button>
@@ -266,7 +263,7 @@ export default function ReservePage() {
       <Button variant="ghost" size="sm" className="w-full text-muted-foreground"
         onClick={() => refetch()} disabled={isLoading}>
         <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-        Rafraîchir les données
+        {t("data_refresh")}
       </Button>
     </div>
   );

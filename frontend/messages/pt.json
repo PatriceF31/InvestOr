@@ -6,13 +6,7 @@
     "history": "Histórico",
     "reserve": "Reserva",
     "admin": "Administração",
-    "price": "Preço do ouro",
-    "connect_wallet_hint": "Conecte a sua carteira para ver os seus dados",
-    "in_your_wallet": "Na sua carteira",
-    "global_stats": "Estatísticas globais",
-    "grams_tokenized": "gramas tokenizados",
-    "total_deposited": "Total depositado no Treasury",
-    "market_value": "Valor de mercado dos GLD"
+    "price": "Preço do ouro"
   },
 "dashboard": {
     "title": "Painel",
@@ -36,8 +30,10 @@
   },
   "trade": {
     "title": "Comprar / Vender GLD",
+    "sub-title":"1 GLD = 1 grama de ouro físico tokenizado",
     "buy": "Comprar",
     "sell": "Vender",
+    "balance": "Saldo", 
     "amount_usdc": "Montante USDC",
     "amount_gld": "Montante GLD",
     "you_receive": "Você recebe",
@@ -56,7 +52,8 @@
     "step2_pending": "✓ Compra GLD...",
     "connect_to_buy": "Conecte a sua carteira para comprar",
     "connect_to_sell": "Conecte a sua carteira para vender",
-    "fees": "Taxas"
+    "fees": "Taxas",
+    "irreversible_trade": "As transações são irreversíveis. Verifique os montantes antes de confirmar. O preço é fornecido pelo Chainlink Oracle."
   },
   "deposit": {
     "title": "Depósito / Levantamento USDC",
@@ -68,17 +65,31 @@
   },
   "reserve": {
     "title": "Estado da Reserva",
+    "sub_title": "Prova de colateralização on-chain",
     "proof_of_reserve": "Verificar reserva",
     "usdc_reserve": "Reserva USDC",
     "gld_supply": "GLD em circulação",
     "gold_value": "Valor ouro (USDC)",
     "ratio": "Rácio de colateralização",
+    "check_ratio": "Verifica o ratio e pausa do Exchange se insuficiente. Pode ser chamado por qualquer pessoa.",
+    "inject_usdc0": "Injectar USDC para restaurar a ratio.",
+    "verification": "Verificação",
     "min_ratio": "Rácio mínimo",
     "deficit": "Défice",
+    "in_progress": "Carregando...",
+    "data_refresh": "Atualizar os dados",
+    "min_required": "Mínimo necessário",
+    "details": "Detalhes",
+    "gold_price": "Preço ouro",
+    "paused": "Pausado",
+    "active": "Activo",
     "recapitalize": "Recapitalizar",
     "last_check": "Última verificação",
     "status_healthy": "Saudável",
-    "status_at_risk": "Em risco"
+    "status_at_risk": "Em risco",
+    "collateral_deficit": "Défice de colateral detectado",
+    "inject_usdc": "USDC a ser injetado para restaurar o rácio mínimo.",
+    "exchange_paused": "O Exchange foi pausado automaticamente."
   },
   "history": {
     "title": "Histórico de operações",
