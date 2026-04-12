@@ -49,6 +49,7 @@ export default function AdminPage() {
   const [removeRecapAddr, setRemoveRecapAddr] = useState("");
   const [feeBps,        setFeeBps]        = useState("");
   const [feeCollector,  setFeeCollector]  = useState("");
+  const [unblacklistAddr, setUnblacklistAddr] = useState("");
 
   const { writeContractAsync, isPending } = useWriteContract();
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
@@ -159,6 +160,16 @@ export default function AdminPage() {
             <Button variant="destructive" disabled={!blacklistAddr || isLoading}
               onClick={() => exec(() => writeContractAsync({ ...gld, functionName: "blacklist", args: [blacklistAddr as `0x${string}`] }))}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+            </Button>
+          </div>
+        </ActionRow>
+        <Separator />
+        <ActionRow label={t("unblacklist")}>
+          <div className="flex gap-2">
+            <Input placeholder="0x..." value={unblacklistAddr} onChange={e => setUnblacklistAddr(e.target.value)} className="font-mono text-sm" />
+            <Button disabled={!unblacklistAddr || isLoading}
+              onClick={() => exec(() => writeContractAsync({ ...gld, functionName: "unblacklist", args: [unblacklistAddr as `0x${string}`] }))}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "OK"}
             </Button>
           </div>
         </ActionRow>

@@ -30,10 +30,8 @@
   },
   "trade": {
     "title": "Acheter / Vendre GLD",
-    "sub-title":"1 GLD = 1 gramme d'or physique tokenisé",
     "buy": "Acheter",
     "sell": "Vendre",
-    "balance": "Solde",
     "amount_usdc": "Montant USDC",
     "amount_gld": "Montant GLD",
     "you_receive": "Vous recevez",
@@ -52,8 +50,7 @@
     "step2_pending": "✓ Achat GLD...",
     "connect_to_buy": "Connectez votre portefeuille pour acheter",
     "connect_to_sell": "Connectez votre portefeuille pour vendre",
-    "fees": "Frais",
-    "irreversible_trade": "Les transactions sont irréversibles. Vérifiez les montants avant de confirmer. Le prix est fourni par Chainlink Oracle."
+    "fees": "Frais"
   },
   "deposit": {
     "title": "Dépôt / Retrait USDC",
@@ -65,31 +62,17 @@
   },
   "reserve": {
     "title": "État de la Réserve",
-    "sub_title": "Preuve de collatéralisation on-chain",
     "proof_of_reserve": "Vérifier la réserve",
     "usdc_reserve": "Réserve USDC",
     "gld_supply": "GLD en circulation",
     "gold_value": "Valeur or (USDC)",
     "ratio": "Ratio de collatéralisation",
-    "check_ratio": "Vérifie le ratio et pause Exchange si insuffisant. Appelable par n'importe qui.",
-    "inject_usdc0": "Injecter des USDC pour restaurer le ratio.",
-    "verification": "Vérification effectuée",
     "min_ratio": "Ratio minimum",
     "deficit": "Déficit",
-    "in_progress": "En cours...",
-    "data_refresh": "Rafraîchir les données",
-    "min_required": "Min requis",
-    "details": "Détails",
-    "gold_price": "Prix or",
-    "paused": "Pausé",
-    "active": "Actif",
     "recapitalize": "Recapitaliser",
     "last_check": "Dernier contrôle",
     "status_healthy": "Sain",
-    "status_at_risk": "En risque",
-    "collateral_deficit": "Déficit de collatéral détecté",
-    "inject_usdc": "USDC à injecter pour restaurer le ratio minimum.",
-    "exchange_paused": "L'Exchange a été automatiquement pausé."
+    "status_at_risk": "En risque"
   },
   "history": {
     "title": "Historique des opérations",
@@ -115,6 +98,7 @@
     "pause_exchange": "Pauser Exchange",
     "unpause_exchange": "Reprendre Exchange",
     "blacklist": "Blacklister",
+    "unblacklist": "Retirer du blacklist",
     "emergency_withdraw": "Retrait d'urgence",
     "connect_hint": "Connectez votre portefeuille pour accéder à l'administration."
   },
