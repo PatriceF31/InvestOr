@@ -27,6 +27,9 @@ contract GLD is
     /// @dev Adresse autorisée à mint/burn (ex: Exchange)
     address public minter;
 
+    /// @dev Liste des adresses blacklistées (pour itération, car mapping non itérable)
+    address[] public blacklistList;
+
     // ─── Events ──────────────────────────────────────────────────────────────
 
     event Blacklisted(address indexed account);
@@ -109,14 +112,29 @@ contract GLD is
     // ─── Blacklist ────────────────────────────────────────────────────────────
 
     function blacklist(address account) external onlyOwner {
-        if (account == address(0)) revert ZeroAddress();
-        _blacklisted[account] = true;
-        emit Blacklisted(account);
+        if (!_blacklisted[account]) {
+            _blacklisted[account] = true;
+            blacklistList.push(account);
+            emit Blacklisted(account);
+        }
     }
 
     function unblacklist(address account) external onlyOwner {
-        _blacklisted[account] = false;
-        emit Unblacklisted(account);
+        if (_blacklisted[account]) {
+            _blacklisted[account] = false;
+            emit Unblacklisted(account);
+            for (uint256 i = 0; i < blacklistList.length; i++) {
+                if (blacklistList[i] == account) {
+                    blacklistList[i] = blacklistList[blacklistList.length - 1];
+                    blacklistList.pop();
+                    break;
+                }
+            }
+        }
+    }
+
+    function getBlacklist() external view returns (address[] memory) {
+        return blacklistList;
     }
 
     function isBlacklisted(address account) external view returns (bool) {
@@ -141,8 +159,11 @@ contract GLD is
 
     // ─── Storage gap ─────────────────────────────────────────────────────────
 
-    /// @dev Réserve 48 slots pour les futures variables de storage
     /// @dev Toujours garder total storage (variables + gap) = 50 slots
-    /// @dev Variables actuelles : _blacklisted (1) + minter (1) = 2 slots utilisés
-    uint256[48] private __gap;
+    /// @dev => 3 slots utilisés, soit 47 restants pour les futures variables
+    /// Slot Variable 
+    /// 1. _blacklisted (mapping)
+    /// 2. blacklistList (address[])
+    /// 3. minter (address)
+    uint256[47] private __gap;
 }

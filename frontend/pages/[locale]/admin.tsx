@@ -60,6 +60,9 @@ export default function AdminPage() {
   const { data: gldMinter }     = useReadContract({ ...gld,      functionName: "minter" });
   const { data: treasuryOp }    = useReadContract({ ...treasury, functionName: "operator" });
 
+  // Liste des adresses blacklistées
+  const { data: blacklistData } = useReadContract({ ...gld,    functionName: "getBlacklist" });
+
   // Collecteur de frais actuel
   const { data: currentFeeCollector } = useReadContract({ ...exchange,    functionName: "feeCollector" });
 
@@ -136,6 +139,17 @@ export default function AdminPage() {
               onClick={() => exec(() => writeContractAsync({ ...gld, functionName: "setMinter", args: [minterAddr as `0x${string}`] }))}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "OK"}
             </Button>
+          </div>
+        </ActionRow>
+        <Separator />
+        <ActionRow label="Adresses blacklistées">
+          <div className="space-y-1">
+            {(blacklistData as string[] | undefined)?.length
+              ? (blacklistData as string[]).map(addr => (
+                  <p key={addr} className="font-mono text-xs text-muted-foreground">{addr}</p>
+                ))
+              : <p className="text-xs text-muted-foreground">Aucune</p>
+            }
           </div>
         </ActionRow>
         <Separator />
@@ -264,6 +278,19 @@ export default function AdminPage() {
 
       {/* Reserve */}
       <AdminCard title="Reserve">
+        <ActionRow label="Recapitalisateurs actifs">
+          <div className="space-y-1">
+            {(recapitalizersList as string[] | undefined)?.length
+              ? (recapitalizersList as string[]).map(addr => (
+                  <p key={addr} className="font-mono text-xs text-muted-foreground">
+                    {addr}
+                  </p>
+                ))
+              : <p className="text-xs text-muted-foreground">Aucun</p>
+            }
+          </div>
+        </ActionRow>
+        <Separator />
         <ActionRow label={`${t("set_min_ratio")} (bps, ex: 10000 = 100%, 11000 = 110%)`}>
           <div className="flex gap-2">
             <Input type="number" placeholder="10000" value={minRatio} onChange={e => setMinRatio(e.target.value)} />

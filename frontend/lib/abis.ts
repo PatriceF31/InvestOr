@@ -476,6 +476,19 @@ export const GLDABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "getBlacklist",
+    "outputs": [
+      {
+        "internalType": "address[]",
+        "name": "",
+        "type": "address[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
