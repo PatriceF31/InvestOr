@@ -52,14 +52,22 @@ export default function AdminPage() {
 
   const { writeContractAsync, isPending } = useWriteContract();
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({ hash: txHash });
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
 
   // Vérifier si l'adresse connectée est owner de GLD
   const { data: gldOwner }      = useReadContract({ ...gld,      functionName: "owner" });
   const { data: exchangePaused } = useReadContract({ ...exchange, functionName: "paused" });
   const { data: gldMinter }     = useReadContract({ ...gld,      functionName: "minter" });
   const { data: treasuryOp }    = useReadContract({ ...treasury, functionName: "operator" });
+
+  // Collecteur de frais actuel
+  const { data: currentFeeCollector } = useReadContract({ ...exchange,    functionName: "feeCollector" });
+
+  // Frais actuel
+  const { data: currentFeeBps } = useReadContract({ ...exchange,    functionName: "feeBps"});
+
+  // Liste des recapitalisateurs
+  const { data: recapitalizersList } = useReadContract({ ...reserve,    functionName: "getRecapitalizers" });
 
   const isOwner  = isConnected && address?.toLowerCase() === (gldOwner as string)?.toLowerCase();
   const isLoading = isPending || isConfirming;
@@ -218,20 +226,13 @@ export default function AdminPage() {
           </div>
         </ActionRow>
       </AdminCard>
-      <Separator />
-        <ActionRow label="Frais (bps, ex: 50 = 0.5%, 0 = gratuit)">
-          <div className="flex gap-2">
-            <Input type="number" placeholder="0" value={feeBps} onChange={e => setFeeBps(e.target.value)} />
-            <Button disabled={feeBps === "" || isLoading}
-              onClick={() => exec(() => writeContractAsync({
-                ...reserve, functionName: "setExchangeFeeBps", args: [BigInt(feeBps)]
-              }))}>
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "OK"}
-            </Button>
-          </div>
-        </ActionRow>
-        <Separator />
+
+      {/* Exchange Fees */}
+      <AdminCard title="Frais">
         <ActionRow label="Collecteur de frais">
+          <div className="text-xs text-muted-foreground mb-2">
+            Actuel : <span className="font-mono">{(currentFeeCollector as string) || "—"}</span>
+          </div>
           <div className="flex gap-2">
             <Input placeholder="0x..." value={feeCollector} onChange={e => setFeeCollector(e.target.value)} className="font-mono text-sm" />
             <Button disabled={!feeCollector || isLoading}
@@ -242,6 +243,24 @@ export default function AdminPage() {
             </Button>
           </div>
         </ActionRow>
+        <Separator />
+        <ActionRow label="Frais (bps, ex: 50 = 0.5%, 0 = gratuit)">
+          <div className="text-xs text-muted-foreground mb-2">
+            Actuel : <span className="font-mono">
+              {currentFeeBps !== undefined ? `${currentFeeBps.toString()} bps (${(Number(currentFeeBps) / 100).toFixed(2)}%)` : "—"}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <Input type="number" placeholder="0" value={feeBps} onChange={e => setFeeBps(e.target.value)} />
+            <Button disabled={feeBps === "" || isLoading}
+              onClick={() => exec(() => writeContractAsync({
+                ...reserve, functionName: "setExchangeFeeBps", args: [BigInt(feeBps)]
+              }))}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "OK"}
+            </Button>
+          </div>
+        </ActionRow>
+      </AdminCard>
 
       {/* Reserve */}
       <AdminCard title="Reserve">

@@ -84,6 +84,7 @@ contract Reserve is
 
     /// @notice Adresses autorisées à recapitaliser (en plus du owner)
     mapping(address => bool) public recapitalizers;
+    address[] public recapitalizerList;
 
     // ─── Events ──────────────────────────────────────────────────────────────
 
@@ -384,14 +385,32 @@ contract Reserve is
     /// @notice Ajoute un recapitalisateur autorisé
     function addRecapitalizer(address account) external onlyOwner {
         if (account == address(0)) revert ZeroAddress();
-        recapitalizers[account] = true;
-        emit RecapitalizerAdded(account);
+        if (!recapitalizers[account]) {
+            recapitalizers[account] = true;
+            recapitalizerList.push(account);
+            emit RecapitalizerAdded(account);
+        }
     }
 
     /// @notice Retire un recapitalisateur
     function removeRecapitalizer(address account) external onlyOwner {
-        recapitalizers[account] = false;
-        emit RecapitalizerRemoved(account);
+        if (recapitalizers[account]) {
+            recapitalizers[account] = false;
+            emit RecapitalizerRemoved(account);
+            // Retirer de la liste
+            for (uint256 i = 0; i < recapitalizerList.length; i++) {
+                if (recapitalizerList[i] == account) {
+                    recapitalizerList[i] = recapitalizerList[recapitalizerList.length - 1];
+                    recapitalizerList.pop();
+                    break;
+                }
+            }
+        }
+    }
+
+    /// @notice Retourne la liste des recapitalisateurs autorisés
+    function getRecapitalizers() external view returns (address[] memory) {
+        return recapitalizerList;
     }
 
     // ─── UUPS ────────────────────────────────────────────────────────────────
@@ -400,7 +419,17 @@ contract Reserve is
 
     // ─── Storage gap ─────────────────────────────────────────────────────────
 
-    /// @dev Variables : gld(1)+treasury(1)+exchange(1)+oracle(1)+minRatioBps(1)
-    /// @dev   +oracleMaxAge(1)+lastCheckAt(1)+lastCheckHealthy(1) = 8 slots
-    uint256[41] private __gap;
+    /// @dev => 10 slots utilisés, soit 40 restants pour les futures variables
+    /// Slot Variable 
+    /// 1. gld (IGLDReserve) 
+    /// 2. treasury (ITreasuryReserve) 
+    /// 3. exchange (IExchange) 
+    /// 4. oracle (IOracle)
+    /// 5. minRatioBps (uint256)
+    /// 6. oracleMaxAge (uint256)
+    /// 7. lastCheckAt (uint256)
+    /// 8. lastCheckHealthy (bool)
+    /// 9. recapitalizers (mapping)
+    /// 10. recapitalizerList (address[])
+    uint256[40] private __gap;
 }
