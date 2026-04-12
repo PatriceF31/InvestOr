@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol"; 
 
 /// @title Treasury — Gardien des dépôts USDC
 /// @notice Reçoit et restitue des USDC pour le compte des utilisateurs
@@ -15,6 +16,7 @@ contract Treasury is
     Initializable,
     OwnableUpgradeable,
     PausableUpgradeable,
+    ReentrancyGuard, 
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
@@ -86,7 +88,7 @@ contract Treasury is
     /// @notice Dépose des USDC dans le Treasury
     /// @dev Réservé à l'opérateur (Exchange) et au owner (admins)
     /// @param amount Montant en unités USDC (6 décimales)
-    function deposit(uint256 amount) external whenNotPaused onlyOperator {
+    function deposit(uint256 amount) external whenNotPaused onlyOperator nonReentrant {
         if (amount == 0) revert ZeroAmount();
 
         _deposits[msg.sender] += amount;
@@ -100,7 +102,7 @@ contract Treasury is
     /// @notice Retire des USDC du Treasury
     /// @dev Réservé à l'opérateur (Exchange) et au owner (admins)
     /// @param amount Montant à retirer
-    function withdraw(uint256 amount) external whenNotPaused onlyOperator {
+    function withdraw(uint256 amount) external whenNotPaused onlyOperator nonReentrant {
         if (amount == 0) revert ZeroAmount();
 
         uint256 available = usdc.balanceOf(address(this));
@@ -117,7 +119,7 @@ contract Treasury is
     /// @dev Réservé à l'opérateur (Exchange) — utilisé lors des ventes GLD
     /// @param to     Adresse destinataire (l'utilisateur qui vend)
     /// @param amount Montant à envoyer
-    function operatorWithdraw(address to, uint256 amount) external whenNotPaused onlyOperator {
+    function operatorWithdraw(address to, uint256 amount) external whenNotPaused onlyOperator nonReentrant {
         if (to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
 
@@ -132,12 +134,14 @@ contract Treasury is
     }
 
     /// @notice Injecte des USDC directement (recapitalization par Reserve)
-    function injectCapital(uint256 amount) external whenNotPaused {
+    function injectCapital(uint256 amount) external whenNotPaused nonReentrant {
         if (msg.sender != owner() && msg.sender != operator && msg.sender != reserve)
             revert UnauthorizedOperator(msg.sender);
         if (amount == 0) revert ZeroAmount();
+
+         _totalDeposited += amount;
         IERC20(address(usdc)).safeTransferFrom(msg.sender, address(this), amount);
-        _totalDeposited += amount;
+       
         emit Deposited(msg.sender, amount);
     }
 
@@ -191,7 +195,14 @@ contract Treasury is
 
     // ─── Storage gap ─────────────────────────────────────────────────────────
 
-    /// @dev Réserve 47 slots pour les futures variables de storage
-    /// @dev Variables actuelles : usdc (1) + _deposits (1) + _totalDeposited (1) + operator (1) = 4 slots utilisés
-    uint256[46] private __gap;
+
+    /// @dev => 6 slots utilisés, soit 44 restants pour les futures variables
+    /// Slot Variable
+    /// 1. usdc
+    /// 2. _deposits
+    /// 3. _totalDeposited
+    /// 4. operator
+    /// 5. reserve
+    /// 6. ReentrancyGuard
+    uint256[44] private __gap;
 }

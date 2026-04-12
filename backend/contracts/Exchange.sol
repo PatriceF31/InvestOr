@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @dev Interface minimale Chainlink AggregatorV3
 interface AggregatorV3Interface {
@@ -42,6 +43,7 @@ contract Exchange is
     Initializable,
     OwnableUpgradeable,
     PausableUpgradeable,
+    ReentrancyGuard,  
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
@@ -181,7 +183,7 @@ contract Exchange is
     /// @notice Achète des GLD en déposant des USDC dans le Treasury
     /// @dev L'utilisateur doit avoir approuvé usdc.approve(exchange, usdcAmount)
     /// @param usdcAmount Montant USDC à dépenser (6 décimales)
-    function buy(uint256 usdcAmount) external whenNotPaused {
+    function buy(uint256 usdcAmount) external whenNotPaused nonReentrant {
         if (usdcAmount == 0) revert ZeroAmount();
 
         uint256 gldAmount = previewBuy(usdcAmount);
@@ -189,22 +191,24 @@ contract Exchange is
 
         (uint256 price,) = getPrice();
 
-        // 1. Transfert USDC user → Exchange
-        usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);
-
-        // 2. Calcul et transfert des frais
+        // 1. Calcul et transfert des frais (pas d'interaction)
         uint256 feeAmount = (usdcAmount * feeBps) / BASIS_POINTS;
         uint256 netAmount = usdcAmount - feeAmount;
-        if (feeAmount > 0 && feeCollector != address(0)) {
-            usdc.safeTransfer(feeCollector, feeAmount);
-        }
+
+        // 2. Transfert USDC user → Exchange (entrée des fonds)
+        usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);
 
         // 3. Dépôt USDC net dans Treasury
         usdc.forceApprove(address(treasury), netAmount);
         treasury.deposit(netAmount);
 
-        // 4. Mint GLD pour l'utilisateur
+        // 4. Mint GLD pour l'utilisateur (AVANT d'envoyer les fees vers l'extérieur, pour éviter les reentrancy)
         gld.mint(msg.sender, gldAmount);
+
+        // 5. Fees en dernier (même si feeCollector ré-entre, le mint est déjà fait)
+        if (feeAmount > 0 && feeCollector != address(0)) {
+            usdc.safeTransfer(feeCollector, feeAmount);
+        }
 
         emit TokensBought(msg.sender, usdcAmount, gldAmount, price);
     }
@@ -213,7 +217,7 @@ contract Exchange is
 
     /// @notice Vend des GLD et récupère des USDC depuis le Treasury
     /// @param gldAmount Quantité de GLD à vendre (3 décimales)
-    function sell(uint256 gldAmount) external whenNotPaused {
+    function sell(uint256 gldAmount) external whenNotPaused nonReentrant {
         if (gldAmount == 0) revert ZeroAmount();
 
         uint256 usdcAmount = previewSell(gldAmount);
@@ -294,8 +298,15 @@ contract Exchange is
 
     // ─── Storage gap ─────────────────────────────────────────────────────────
 
-    /// @dev Réserve 44 slots pour les futures variables de storage
-    /// @dev Variables actuelles : gld(1) + treasury(1) + usdc(1) + priceOracle(1)
-    /// @dev   + fallbackPrice(1) + oracleMaxAge(1) + feeBps(1) + feeCollector(1) = 8 slots utilisés
+    /// @dev => 8 slots utilisés, soit 42 restants pour les futures variables
+    /// Slot Variable 
+    /// 1. gld
+    /// 2. treasury
+    /// 3. usdc
+    /// 4. priceOracle
+    /// 5. fallbackPrice
+    /// 6. oracleMaxAge
+    /// 7. feeBps
+    /// 8. feeCollector
     uint256[42] private __gap;
 }

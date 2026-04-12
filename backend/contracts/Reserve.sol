@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @dev Interface GLD
 interface IGLDReserve {
@@ -51,6 +52,7 @@ interface IExchange {
 contract Reserve is
     Initializable,
     OwnableUpgradeable,
+    ReentrancyGuard, 
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
@@ -296,21 +298,26 @@ contract Reserve is
     /// @notice Injecte des USDC dans le Treasury pour restaurer le ratio
     /// @dev Réservé au owner — l'appelant doit avoir approuvé usdc.approve(reserve, amount)
     /// @param amount Montant USDC à injecter
-    function recapitalize(uint256 amount) external onlyRecapitalizerOrOwner {
+    function recapitalize(uint256 amount) external onlyRecapitalizerOrOwner nonReentrant {
         if (amount == 0) revert ZeroAmount();
 
         address usdcAddr = treasury.usdc();
         IERC20 usdc = IERC20(usdcAddr);
 
-    usdc.safeTransferFrom(msg.sender, address(this), amount);
+        // 1. Entrée des fonds : user → Reserve → Treasury
+        usdc.safeTransferFrom(msg.sender, address(this), amount);
+
         // Transfert direct vers Treasury via injectCapital
         usdc.forceApprove(address(treasury), amount);
         ITreasuryReserve(address(treasury)).injectCapital(amount);
 
+        // 2. Lecture du nouveau ratio (après injection)
         (, , , uint256 newRatio) = checkReserve();
 
+        // 3. Emit avant l'appel externe final
         emit Recapitalized(msg.sender, amount, newRatio);
 
+        // 4. Unpause Exchange en dernier (appel externe)
         // Si le ratio est restauré, réactiver Exchange
         if (newRatio >= minRatioBps && exchange.paused()) {
             exchange.unpause();
