@@ -129,14 +129,14 @@ export default function PricePage() {
             icon={TrendingUp}
             label={t("per_gram")}
             value={onChainPerGram !== null ? `$${onChainPerGram.toFixed(2)}` : "—"}
-            sub="1 GLD = 1 gramme"
+            sub={`1 GLD = 1 ${t("gram")}`}
             badge="XAU/USD"
           />
           <PriceCard
             icon={TrendingUp}
             label={t("per_oz")}
             value={onChainPerOz !== null ? `$${onChainPerOz.toFixed(2)}` : "—"}
-            sub="1 once troy = 31.1035 g"
+            sub={`1 ${t("oz")} troy = 31.1035 g`}
             badge="XAU/USD"
           />
         </div>

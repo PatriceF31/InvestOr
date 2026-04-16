@@ -135,8 +135,11 @@
     "gold_in_gram": "Or en grammes et en once troy",
     "per_gram": "Par gramme",
     "per_oz": "Par once",
+    "gram": "gramme",
+    "oz": "once",
     "source_oracle": "Source : Oracle Chainlink",
     "source_api": "Source : API (fallback)",
-    "last_update": "Dernière mise à jour"
+    "last_update": "Dernière mise à jour",
+    "refresh": "Rafraîchir"
   }
 }
