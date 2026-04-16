@@ -429,7 +429,7 @@ export default function TradePage() {
           <TrendingUp className="h-6 w-6 text-primary" />
           <h1 className="text-3xl font-bold">{t("title")}</h1>
         </div>
-        <p className="text-muted-foreground text-sm">{t("sub-title")}</p>
+        <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
         {exchangePaused && (
           <Badge variant="destructive">Exchange pausé</Badge>
         )}

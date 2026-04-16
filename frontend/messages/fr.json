@@ -30,6 +30,7 @@
   },
   "trade": {
     "title": "Acheter / Vendre GLD",
+    "subtitle": "1 GLD = 1 gramme d'or physique stocké dans un coffre sécurisé",
     "buy": "Acheter",
     "sell": "Vendre",
     "amount_usdc": "Montant USDC",
@@ -50,7 +51,8 @@
     "step2_pending": "✓ Achat GLD...",
     "connect_to_buy": "Connectez votre portefeuille pour acheter",
     "connect_to_sell": "Connectez votre portefeuille pour vendre",
-    "fees": "Frais"
+    "fees": "Frais",
+    "irreversible_trade": "Attention : cette opération est irréversible"
   },
   "deposit": {
     "title": "Dépôt / Retrait USDC",
@@ -62,6 +64,12 @@
   },
   "reserve": {
     "title": "État de la Réserve",
+    "subtitle": "Vérifiez la santé de la réserve et les statistiques clés",
+    "min_required": "Minimum requis",
+    "details": "Détails de la réserve",
+    "check_ratio": "Vérifier le ratio de collatéralisation",
+    "inject_usdc0": "Injecter USDC pour recapitaliser",
+    "gold_price": "Prix de l'or",
     "proof_of_reserve": "Vérifier la réserve",
     "usdc_reserve": "Réserve USDC",
     "gld_supply": "GLD en circulation",
@@ -78,6 +86,10 @@
     "title": "Historique des opérations",
     "action": "Action",
     "amount": "Montant",
+    "operation": "opération",
+    "found": "Trouvée",
+    "all": "Toutes",
+    "mine": "Mes opérations",
     "price": "Prix",
     "date": "Date",
     "filter_all": "Toutes",
@@ -86,7 +98,9 @@
     "sell": "Vente GLD",
     "deposit": "Dépôt USDC",
     "withdraw": "Retrait USDC",
-    "connect_hint": "Connectez votre portefeuille"
+    "connect_hint": "Connectez votre portefeuille",
+    "refresh": "Rafraîchir",
+    "legend": "Légende"
   },
   "admin": {
     "title": "Administration",
@@ -118,6 +132,7 @@
   "price": {
     "title": "Prix de l'or en temps réel",
     "xau_usd": "XAU/USD",
+    "gold_in_gram": "Or en grammes et en once troy",
     "per_gram": "Par gramme",
     "per_oz": "Par once",
     "source_oracle": "Source : Oracle Chainlink",

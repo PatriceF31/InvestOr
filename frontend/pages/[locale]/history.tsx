@@ -237,23 +237,23 @@ export default function HistoryPage() {
           <div>
             <h1 className="text-3xl font-bold">{t("title")}</h1>
             <p className="text-muted-foreground text-sm">
-              {entries.length} opération{entries.length !== 1 ? "s" : ""} trouvée{entries.length !== 1 ? "s" : ""}
+              {entries.length} {t("operation")}{entries.length !== 1 ? "s" : ""} {t("found")}{entries.length !== 1 ? "s" : ""}
             </p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={fetchLogs} disabled={isLoading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          Rafraîchir
+          {t("refresh")}
         </Button>
       </div>
 
       <Tabs defaultValue="recent">
         <TabsList className="w-full">
           <TabsTrigger value="recent" className="flex-1">
-            Toutes ({entries.length})
+           {t("all")} ({entries.length})
           </TabsTrigger>
           <TabsTrigger value="mine" className="flex-1">
-            Mes opérations ({userEntries.length})
+            {t("mine")} ({userEntries.length})
           </TabsTrigger>
         </TabsList>
         <TabsContent value="recent">
@@ -272,7 +272,7 @@ export default function HistoryPage() {
 
       {/* Légende */}
       <div className="rounded-lg border border-border bg-card/50 p-4">
-        <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">Légende</p>
+        <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">{t("legend")}</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {Object.entries(ACTION_CONFIG).map(([key, val]) => {
             const Icon = val.icon;

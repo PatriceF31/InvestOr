@@ -105,13 +105,13 @@ export default function PricePage() {
           <div>
             <h1 className="text-3xl font-bold">{t("title")}</h1>
             <p className="text-muted-foreground text-sm">
-              XAU/USD — Or en grammes et en once troy
+              XAU/USD — {t("gold_in_gram")}
             </p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          Rafraîchir
+          {t("refresh")}
         </Button>
       </div>
 
