@@ -30,7 +30,7 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={goldLight}>
+        <RainbowKitProvider theme={{ lightMode: goldLight, darkMode: goldDark }} locale={locale ?? "fr"}>
           <NextIntlClientProvider
             locale={locale ?? "fr"}
             messages={messages ?? {}}

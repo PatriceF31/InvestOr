@@ -60,7 +60,8 @@
     "withdraw": "Retirer",
     "your_balance": "Votre solde",
     "treasury_balance": "Solde Treasury",
-    "amount": "Montant"
+    "amount": "Montant",
+    "your_wallet": "Votre wallet"
   },
   "reserve": {
     "title": "État de la Réserve",
