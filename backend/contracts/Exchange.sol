@@ -161,57 +161,55 @@ contract Exchange is
     /// @return gldAmount Quantité GLD (3 décimales)
     function previewBuy(uint256 usdcAmount) public view returns (uint256 gldAmount) {
         if (usdcAmount == 0) revert ZeroAmount();
-
-        // 1. Calcul des frais 
+        (uint256 price, ) = getPrice();
+        
+        // Calcul des frais AVANT de calculer les GLD
         uint256 feeAmount = (usdcAmount * feeBps) / BASIS_POINTS;
         uint256 netAmount = usdcAmount - feeAmount;
-
-        (uint256 price,) = getPrice();
-        // USDC: 6 dec | price: 8 dec | GLD: 3 dec
-        // gldAmount = usdcAmount * 10^(8+3) / (price * 10^6)
-        // = usdcAmount * 10^5 / price
+        
+        // GLD calculés sur le montant NET (correction du bug)
         gldAmount = (netAmount * 1e5) / price;
     }
 
     /// @notice Calcule la quantité d'USDC reçue pour un montant GLD
     /// @param gldAmount Quantité GLD (3 décimales)
-    /// @return netAmount Montant USDC (6 décimales)
-    function previewSell(uint256 gldAmount) public view returns (uint256 netAmount) {
+    /// @return usdcAmount Montant USDC (6 décimales)
+    function previewSell(uint256 gldAmount) public view returns (uint256 usdcAmount) {
         if (gldAmount == 0) revert ZeroAmount();
+        (uint256 price, ) = getPrice();
+        uint256 grossAmount = (gldAmount * price) / 1e5;
         
-        (uint256 price,) = getPrice();
-        // usdcAmount = gldAmount * price / 10^5
-        uint256 usdcAmount = (gldAmount * price) / 1e5;
-
-        // 1. Calcul des frais
-        uint256 feeAmount = (usdcAmount * feeBps) / BASIS_POINTS;
-        netAmount = usdcAmount - feeAmount;
+        // Déduire les frais du montant brut
+        uint256 feeAmount = (grossAmount * feeBps) / BASIS_POINTS;
+        usdcAmount = grossAmount - feeAmount;
     }
     // ─── Achat ───────────────────────────────────────────────────────────────
 
     /// @notice Achète des GLD en déposant des USDC dans le Treasury
     /// @dev L'utilisateur doit avoir approuvé usdc.approve(exchange, usdcAmount)
-    /// @param netAmount Montant USDC à dépenser (6 décimales)
-    /// @param feeAmount Montant des frais à prélever (6 décimales)
-    function buy(uint256 netAmount, uint256 feeAmount) external whenNotPaused nonReentrant {
-        if (netAmount == 0) revert ZeroAmount();
+    function buy(uint256 usdcAmount) external whenNotPaused nonReentrant {
+        if (usdcAmount == 0) revert ZeroAmount();
 
-        uint256 gldAmount = previewBuy(netAmount);
+        uint256 gldAmount = previewBuy(usdcAmount);
         if (gldAmount == 0) revert ZeroAmount();
 
         (uint256 price,) = getPrice();
 
-        // 2. Transfert USDC user → Exchange (entrée des fonds)
-        usdc.safeTransferFrom(msg.sender, address(this), netAmount);
+        // Recalcul local de feeAmount pour le transfert
+        uint256 feeAmount = (usdcAmount * feeBps) / BASIS_POINTS;
+        uint256 netAmount = usdcAmount - feeAmount;
 
-        // 3. Dépôt USDC net dans Treasury
+        // Transfert USDC user → Exchange (entrée des fonds)
+        usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);
+
+        // Dépôt USDC net dans Treasury
         usdc.forceApprove(address(treasury), netAmount);
         treasury.deposit(netAmount);
 
-        // 4. Mint GLD pour l'utilisateur (AVANT d'envoyer les fees vers l'extérieur, pour éviter les reentrancy)
+        // Mint GLD pour l'utilisateur (AVANT d'envoyer les fees vers l'extérieur, pour éviter les reentrancy)
         gld.mint(msg.sender, gldAmount);
 
-        // 5. Fees en dernier (même si feeCollector ré-entre, le mint est déjà fait)
+        // Fees en dernier (même si feeCollector ré-entre, le mint est déjà fait)
         if (feeAmount > 0 && feeCollector != address(0)) {
             usdc.safeTransfer(feeCollector, feeAmount);
         }
@@ -223,9 +221,7 @@ contract Exchange is
 
     /// @notice Vend des GLD et récupère des USDC depuis le Treasury
     /// @param gldAmount Quantité de GLD à vendre (3 décimales)
-    /// @param netAmount Montant USDC à recevoir (6 décimales)
-    /// @param feeAmount Montant des frais à prélever (6 décimales)
-    function sell(uint256 gldAmount, uint256 netAmount, uint256 feeAmount) external whenNotPaused nonReentrant {
+    function sell(uint256 gldAmount) external whenNotPaused nonReentrant {
         if (gldAmount == 0) revert ZeroAmount();
 
         uint256 usdcAmount = previewSell(gldAmount);
@@ -233,14 +229,22 @@ contract Exchange is
 
         (uint256 price,) = getPrice();
 
-        // 2. Burn GLD de l'utilisateur
+        // Recalcul local — previewSell retourne déjà le net
+        // donc on recalcule le brut pour déduire les frais
+        uint256 grossAmount = (gldAmount * price) / 1e5;
+        uint256 feeAmount   = (grossAmount * feeBps) / BASIS_POINTS;
+        uint256 netAmount   = grossAmount - feeAmount;
+
+        // Burn GLD de l'utilisateur
         gld.burn(msg.sender, gldAmount);
 
-        // 3. Retrait USDC depuis Treasury
+        // Retrait USDC depuis Treasury
         // Frais vers feeCollector, net vers l'utilisateur
         if (feeAmount > 0 && feeCollector != address(0)) {
             treasury.operatorWithdraw(feeCollector, feeAmount);
         }
+
+        // Net vers l'utilisateur
         treasury.operatorWithdraw(msg.sender, netAmount);
 
         emit TokensSold(msg.sender, gldAmount, usdcAmount, price);
