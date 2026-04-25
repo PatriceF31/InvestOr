@@ -187,7 +187,7 @@ contract Exchange is
 
     /// @notice Achète des GLD en déposant des USDC dans le Treasury
     /// @dev L'utilisateur doit avoir approuvé usdc.approve(exchange, usdcAmount)
-    function buy(uint256 usdcAmount) external whenNotPaused nonReentrant {
+    function buy(uint256 usdcAmount) external whenNotPaused  nonReentrant {
         if (usdcAmount == 0) revert ZeroAmount();
 
         uint256 gldAmount = previewBuy(usdcAmount);
@@ -221,7 +221,7 @@ contract Exchange is
 
     /// @notice Vend des GLD et récupère des USDC depuis le Treasury
     /// @param gldAmount Quantité de GLD à vendre (3 décimales)
-    function sell(uint256 gldAmount) external whenNotPaused nonReentrant {
+    function sell(uint256 gldAmount) external nonReentrant {
         if (gldAmount == 0) revert ZeroAmount();
 
         uint256 usdcAmount = previewSell(gldAmount);

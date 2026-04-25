@@ -270,11 +270,10 @@ describe("Exchange — Étape 4 : achat et vente GLD/USDC", () => {
       ).to.revert(ethers);
     });
 
-    it("échoue en pause", async () => {
-      await exchange.pause();
-      await expect(
-        exchange.connect(alice).sell(1n)
-      ).to.be.revertedWithCustomError(exchange, "EnforcedPause");
+    it("sell fonctionne en pause", async () => {
+        await exchange.pause();
+        const tx = await exchange.connect(alice).sell(1n);
+        expect(tx).to.not.be.undefined;
     });
   });
 
