@@ -161,42 +161,48 @@ contract Exchange is
     /// @return gldAmount Quantité GLD (3 décimales)
     function previewBuy(uint256 usdcAmount) public view returns (uint256 gldAmount) {
         if (usdcAmount == 0) revert ZeroAmount();
+
+        // 1. Calcul des frais 
+        uint256 feeAmount = (usdcAmount * feeBps) / BASIS_POINTS;
+        uint256 netAmount = usdcAmount - feeAmount;
+
         (uint256 price,) = getPrice();
         // USDC: 6 dec | price: 8 dec | GLD: 3 dec
         // gldAmount = usdcAmount * 10^(8+3) / (price * 10^6)
         // = usdcAmount * 10^5 / price
-        gldAmount = (usdcAmount * 1e5) / price;
+        gldAmount = (netAmount * 1e5) / price;
     }
 
     /// @notice Calcule la quantité d'USDC reçue pour un montant GLD
     /// @param gldAmount Quantité GLD (3 décimales)
-    /// @return usdcAmount Montant USDC (6 décimales)
-    function previewSell(uint256 gldAmount) public view returns (uint256 usdcAmount) {
+    /// @return netAmount Montant USDC (6 décimales)
+    function previewSell(uint256 gldAmount) public view returns (uint256 netAmount) {
         if (gldAmount == 0) revert ZeroAmount();
+        
         (uint256 price,) = getPrice();
         // usdcAmount = gldAmount * price / 10^5
-        usdcAmount = (gldAmount * price) / 1e5;
-    }
+        uint256 usdcAmount = (gldAmount * price) / 1e5;
 
+        // 1. Calcul des frais
+        uint256 feeAmount = (usdcAmount * feeBps) / BASIS_POINTS;
+        netAmount = usdcAmount - feeAmount;
+    }
     // ─── Achat ───────────────────────────────────────────────────────────────
 
     /// @notice Achète des GLD en déposant des USDC dans le Treasury
     /// @dev L'utilisateur doit avoir approuvé usdc.approve(exchange, usdcAmount)
-    /// @param usdcAmount Montant USDC à dépenser (6 décimales)
-    function buy(uint256 usdcAmount) external whenNotPaused nonReentrant {
-        if (usdcAmount == 0) revert ZeroAmount();
+    /// @param netAmount Montant USDC à dépenser (6 décimales)
+    /// @param feeAmount Montant des frais à prélever (6 décimales)
+    function buy(uint256 netAmount, uint256 feeAmount) external whenNotPaused nonReentrant {
+        if (netAmount == 0) revert ZeroAmount();
 
-        uint256 gldAmount = previewBuy(usdcAmount);
+        uint256 gldAmount = previewBuy(netAmount);
         if (gldAmount == 0) revert ZeroAmount();
 
         (uint256 price,) = getPrice();
 
-        // 1. Calcul et transfert des frais (pas d'interaction)
-        uint256 feeAmount = (usdcAmount * feeBps) / BASIS_POINTS;
-        uint256 netAmount = usdcAmount - feeAmount;
-
         // 2. Transfert USDC user → Exchange (entrée des fonds)
-        usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);
+        usdc.safeTransferFrom(msg.sender, address(this), netAmount);
 
         // 3. Dépôt USDC net dans Treasury
         usdc.forceApprove(address(treasury), netAmount);
@@ -210,24 +216,22 @@ contract Exchange is
             usdc.safeTransfer(feeCollector, feeAmount);
         }
 
-        emit TokensBought(msg.sender, usdcAmount, gldAmount, price);
+        emit TokensBought(msg.sender, netAmount, gldAmount, price);
     }
 
     // ─── Vente ───────────────────────────────────────────────────────────────
 
     /// @notice Vend des GLD et récupère des USDC depuis le Treasury
     /// @param gldAmount Quantité de GLD à vendre (3 décimales)
-    function sell(uint256 gldAmount) external whenNotPaused nonReentrant {
+    /// @param netAmount Montant USDC à recevoir (6 décimales)
+    /// @param feeAmount Montant des frais à prélever (6 décimales)
+    function sell(uint256 gldAmount, uint256 netAmount, uint256 feeAmount) external whenNotPaused nonReentrant {
         if (gldAmount == 0) revert ZeroAmount();
 
         uint256 usdcAmount = previewSell(gldAmount);
         if (usdcAmount == 0) revert ZeroAmount();
 
         (uint256 price,) = getPrice();
-
-        // 1. Calcul des frais
-        uint256 feeAmount = (usdcAmount * feeBps) / BASIS_POINTS;
-        uint256 netAmount = usdcAmount - feeAmount;
 
         // 2. Burn GLD de l'utilisateur
         gld.burn(msg.sender, gldAmount);
