@@ -72,6 +72,8 @@ export default function AdminPage() {
 
   // Liste des recapitalisateurs
   const { data: recapitalizersList } = useReadContract({ ...reserve,    functionName: "getRecapitalizers" });
+  const { data: currentFallbackPrice } = useReadContract({ ...exchange, functionName: "fallbackPrice" });
+  const currentPriceDisplay = currentFallbackPrice ? `$${(Number(currentFallbackPrice) / 1e8).toFixed(2)}/g` : "—";
 
   const isOwner  = isConnected && address?.toLowerCase() === (gldOwner as string)?.toLowerCase();
   const isLoading = isPending || isConfirming;
@@ -237,9 +239,10 @@ export default function AdminPage() {
           </div>
         </ActionRow>
         <Separator />
-        <ActionRow label={`${t("set_fallback_price")} (8 décimales, ex: 14750000000 = $147.50/g)`}>
+        <ActionRow label={`${t("set_fallback_price")} (8 décimales — actuel: ${currentPriceDisplay})`}>
           <div className="flex gap-2">
-            <Input type="number" placeholder="14750000000" value={fallbackPrice} onChange={e => setFallbackPrice(e.target.value)} />
+            <Input type="number" placeholder={currentFallbackPrice ? currentFallbackPrice.toString() : "14750000000"} value={fallbackPrice} 
+              onChange={e => setFallbackPrice(e.target.value)} />
             <Button disabled={!fallbackPrice || isLoading}
               onClick={() => exec(() => writeContractAsync({ 
                 ...reserve, 
