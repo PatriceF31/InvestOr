@@ -25,12 +25,10 @@ const PROXIES = {
 
 // ─── Quels contrats upgrader ? (mettre false pour ignorer) ────────────────────
 const UPGRADE = {
-  GLD:          false,
-  Treasury:     false,
-  Exchange:     false,
-  Reserve:      false,
-  EventLogger:  true,
-  SerialNumber: true,
+  GLD:      true,
+  Treasury: true,
+  Exchange: true,
+  Reserve:  true,
 };
 
 // ─── ABIs minimaux ────────────────────────────────────────────────────────────
