@@ -10,5 +10,7 @@
   "EventLoggerModule#EventLogger": "0xA77983a5CAC1432b18121259e4FaA58fAE695eD5",
   "EventLoggerModule#EventLoggerProxy": "0x70eFf6af5aCE213cEe7a3AFC4587db478c4F4b5a",
   "SerialNumberModule#SerialNumber": "0x20f2D421d4CD4D0Cef53C262328fCD2134478f53",
-  "SerialNumberModule#SerialNumberProxy": "0x24622EfA10CfBA2B6F0e2845a89B09711293867d"
+  "SerialNumberModule#SerialNumberProxy": "0x24622EfA10CfBA2B6F0e2845a89B09711293867d",
+  "LingotOrModule#LingotOr": "0x73a95339328C3889cc4EaB16d7996626fcdd780a",
+  "LingotOrModule#InvestOrProxy": "0x69159BBd5EaFf05C381497890F02d78F1b595A83"
 }

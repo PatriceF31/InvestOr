@@ -1,0 +1,14 @@
+{
+  "name": "Lingot Or 1g",
+  "description": "Lingot d'or physique tokenisé — 1 grammes — InvestOr Protocol",
+  "image": "ipfs://TODO/lingot-1g.png",
+  "properties": {
+    "weight_grams": 1,
+    "weight_mg": 1000,
+    "token_id": 1000,
+    "purity": "999.9",
+    "standard": "LBMA Good Delivery",
+    "protocol": "InvestOr",
+    "network": "Ethereum Sepolia"
+  }
+}

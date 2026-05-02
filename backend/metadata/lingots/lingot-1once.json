@@ -1,0 +1,14 @@
+{
+  "name": "Lingot Or 1 Once (31.103g)",
+  "description": "Lingot d'or physique tokenisé — 1 once troy (31.103 grammes) — InvestOr Protocol",
+  "image": "ipfs://TODO/lingot-1once.png",
+  "properties": {
+    "weight_grams": 31.103,
+    "weight_mg": 31103,
+    "token_id": 31103,
+    "purity": "999.9",
+    "standard": "LBMA Good Delivery",
+    "protocol": "InvestOr",
+    "network": "Ethereum Sepolia"
+  }
+}
