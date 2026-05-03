@@ -9,17 +9,19 @@ async function main() {
 
   const lingot = await ethers.getContractAt("LingotOr", LINGOT_ADDRESS, deployer);
 
-  const grammes  = await lingot.totalGrammesEnCoffre();
-  const balance  = await lingot.balanceOf(DEPLOYER, 1000n);
-  const proposal = await lingot.getMintProposal(4n);
+  const grammes    = await lingot.totalGrammesEnCoffre();
+  const balance    = await lingot.balanceOf(DEPLOYER, 1000n);
+  const mintP5     = await lingot.getMintProposal(5n);
+  const burnP1     = await lingot.getBurnProposal(1n);
 
   console.log("\n═══════════════════════════════════════════════════════");
-  console.log("  InvestOr — Vérification LingotOr après approveMint");
+  console.log("  InvestOr — Vérification LingotOr");
   console.log("═══════════════════════════════════════════════════════");
   console.log(`  Grammes en coffre      : ${grammes} mg (${Number(grammes)/1000}g)`);
   console.log(`  Balance deployer (1g)  : ${balance} lingot(s)`);
-  console.log(`  Proposal #4 executed   : ${proposal.executed}`);
-  console.log(`  Proposal #4 rejected   : ${proposal.rejected}`);
+  console.log(`  Mint Proposal #5 executed  : ${mintP5.executed}`);
+  console.log(`  Burn Proposal #1 executed  : ${burnP1.executed}`);
+  console.log(`  Burn Proposal #1 rejected  : ${burnP1.rejected}`);
   console.log("═══════════════════════════════════════════════════════\n");
 }
 
