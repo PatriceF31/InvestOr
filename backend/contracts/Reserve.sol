@@ -46,6 +46,11 @@ interface IExchange {
     function setFeeCollector(address newCollector) external;
 }
 
+/// @dev Interface LingotOr pour accéder au total de grammes en coffre (Proof of Reserve) — optionnel, dépend de l'implémentation de LingotOr
+interface ILingotOr {
+    function totalGrammesEnCoffre() external view returns (uint256);
+}
+
 /// @title Reserve — Surveillance et Proof of Reserve du protocole InvestOr
 /// @notice Vérifie que le Treasury USDC couvre les GLD en circulation au prix actuel
 /// @dev Peut pauser Exchange automatiquement si le ratio est insuffisant
@@ -71,6 +76,7 @@ contract Reserve is
     ITreasuryReserve public treasury;
     IExchange        public exchange;
     IOracle          public oracle;
+    ILingotOr        public lingotOr;  // address(0) = mode V1 (USDC), sinon mode V2 (grammes)
 
     /// @dev Ratio minimum de collatéralisation en bps (10000 = 100%, 11000 = 110%)
     uint256 public minRatioBps;
@@ -112,6 +118,7 @@ contract Reserve is
     event OracleUpdated(address indexed oldOracle, address indexed newOracle);
     event RecapitalizerAdded(address indexed account);
     event RecapitalizerRemoved(address indexed account);
+    event LingotOrUpdated(address indexed oldAddr, address indexed newAddr);
 
     // ─── Errors ──────────────────────────────────────────────────────────────
 
@@ -185,9 +192,11 @@ contract Reserve is
     // ─── Vues ─────────────────────────────────────────────────────────────────
 
     /// @notice Calcule le ratio de collatéralisation actuel
-    /// @return usdcReserve    USDC dans le Treasury
+    /// @dev V1 : collatéral USDC vs valeur GLD en USDC (oracle requis)
+    ///      V2 : grammes en coffre vs GLD en circulation (pas d'oracle)
+    /// @return usdcReserve    USDC dans le Treasury (V1) ou grammes en coffre (V2)
     /// @return gldSupply      GLD en circulation (unités de base)
-    /// @return goldValueUsdc  Valeur des GLD en USDC au prix actuel
+    /// @return goldValueUsdc  Valeur des GLD en USDC (V1) ou GLD supply en mg (V2)
     /// @return ratioBps       Ratio en basis points (10000 = 100%)
     function checkReserve() public view returns (
         uint256 usdcReserve,
@@ -195,18 +204,31 @@ contract Reserve is
         uint256 goldValueUsdc,
         uint256 ratioBps
     ) {
-        usdcReserve = treasury.totalDeposited();
-        gldSupply   = gld.totalSupply();
+        gldSupply = gld.totalSupply();
 
         if (gldSupply == 0) {
-            return (usdcReserve, 0, 0, type(uint256).max);
+            return (0, 0, 0, type(uint256).max);
         }
+
+        // ── V2 — collatéral physique (lingots ERC-1155) ──────────────────────
+        if (address(lingotOr) != address(0)) {
+            uint256 grammesEnCoffre = lingotOr.totalGrammesEnCoffre();
+            // Les deux sont en milligrammes — ratio direct sans oracle
+            // ratioBps = grammesEnCoffre / gldSupply * 10000
+            usdcReserve   = grammesEnCoffre;  // grammes en coffre (mg)
+            goldValueUsdc = gldSupply;         // GLD supply (mg)
+            if (gldSupply == 0) return (grammesEnCoffre, 0, 0, type(uint256).max);
+            ratioBps = (grammesEnCoffre * BASIS_POINTS) / gldSupply;
+            return (usdcReserve, gldSupply, goldValueUsdc, ratioBps);
+        }
+
+        // ── V1 — collatéral USDC (oracle de prix requis) ─────────────────────
+        usdcReserve = treasury.totalDeposited();
 
         uint256 price = getPrice();
 
         // GLD decimals = 3, USDC decimals = 6, price decimals = 8
         // goldValueUsdc = gldSupply * price / 10^5
-        // (gldSupply * price) / (10^3 * 10^8 / 10^6) = gldSupply * price / 10^5
         goldValueUsdc = (gldSupply * price) / 1e5;
 
         if (goldValueUsdc == 0) {
@@ -420,6 +442,12 @@ contract Reserve is
         return recapitalizerList;
     }
 
+    /// @notice Met à jour l'adresse de LingotOr (pour supporter le mode grammes)
+    function setLingotOr(address newAddr) external onlyOwner {
+        emit LingotOrUpdated(address(lingotOr), newAddr);
+        lingotOr = ILingotOr(newAddr);
+    }
+
     // ─── UUPS ────────────────────────────────────────────────────────────────
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -438,5 +466,6 @@ contract Reserve is
     /// 8. lastCheckHealthy (bool)
     /// 9. recapitalizers (mapping)
     /// 10. recapitalizerList (address[])
-    uint256[40] private __gap;
+    /// 11. lingotOr (ILingotOr) — ajouté dans la V2 pour supporter le mode grammes
+    uint256[39] private __gap;
 }

@@ -25,9 +25,9 @@ const PROXIES = {
 
 // ─── Quels contrats upgrader ? (mettre false pour ignorer) ────────────────────
 const UPGRADE = {
-  GLD:      true,
-  Treasury: true,
-  Exchange: true,
+  GLD:      false,
+  Treasury: false,
+  Exchange: false,
   Reserve:  true,
 };
 
