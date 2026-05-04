@@ -7,6 +7,7 @@ export type ContractAddresses = {
   Reserve: `0x${string}`;
   EventLogger: `0x${string}`;
   SerialNumber: `0x${string}`;
+  LingotOr: `0x${string}`;
 };
 
 // ── Adresses Sepolia ───────────────────────────────────────────────────────
@@ -17,6 +18,7 @@ const SEPOLIA_ADDRESSES: ContractAddresses = {
   Reserve:      "0x130A6A02eee28C4f9A5b01B854ce4aE7BE7D65Ce",
   EventLogger:  "0x70eFf6af5aCE213cEe7a3AFC4587db478c4F4b5a",
   SerialNumber: "0x24622EfA10CfBA2B6F0e2845a89B09711293867d",
+  LingotOr:     "0x69159BBd5EaFf05C381497890F02d78F1b595A83",
 };
 
 // ── Adresses Hardhat local ─────────────────────────────────────────────────
@@ -27,6 +29,7 @@ const HARDHAT_ADDRESSES: ContractAddresses = {
   Reserve:      "0x0000000000000000000000000000000000000000",
   EventLogger:  "0x0000000000000000000000000000000000000000",
   SerialNumber: "0x0000000000000000000000000000000000000000",
+  LingotOr:     "0x0000000000000000000000000000000000000000",
 };
 
 const ADDRESSES: Record<number, ContractAddresses> = {

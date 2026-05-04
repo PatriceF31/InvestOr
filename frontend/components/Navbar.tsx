@@ -17,6 +17,11 @@ const PUBLIC_LINKS = [
   { key: "price",     href: "/price" },
 ];
 
+// Liens gardiens/validateurs
+const GARDIEN_LINKS = [
+  { key: "lingots", href: "/lingots" },
+];
+
 // Liens admin — visibles uniquement par le owner
 const ADMIN_LINKS = [
   { key: "deposit",   href: "/deposit" },
@@ -37,7 +42,22 @@ export default function Navbar() {
   const [dark, setDark] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { address, isConnected } = useAccount();
-  const { gld } = useContracts();
+  const { gld, lingotOr } = useContracts();
+
+  const MINTER_ROLE    = "0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6";
+  const VALIDATOR_ROLE = "0x21702c8af46127c7fa207f89d0b0a8441bb32959a0ac7df790e9ab1a25c98926";
+
+  const { data: isMinter } = useReadContract({
+    ...lingotOr,
+    functionName: "hasRole",
+    args: address ? [MINTER_ROLE as `0x${string}`, address] : undefined,
+  });
+  const { data: isValidator } = useReadContract({
+    ...lingotOr,
+    functionName: "hasRole",
+    args: address ? [VALIDATOR_ROLE as `0x${string}`, address] : undefined,
+  });
+  const isGardienOrValidator = !!(isMinter || isValidator);
 
   // Vérifier si l'adresse connectée est le owner du contrat GLD
   const { data: ownerAddress } = useReadContract({
@@ -52,6 +72,7 @@ export default function Navbar() {
 
   const NAV_LINKS = [
     ...PUBLIC_LINKS,
+    ...(mounted && isGardienOrValidator ? GARDIEN_LINKS : []),
     ...(mounted && isOwner ? ADMIN_LINKS : []),
   ];
 
