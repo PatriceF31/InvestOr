@@ -48,6 +48,11 @@ export function useDashboard() {
         ...reserve,
         functionName: "getReserveStatus",
       },
+      // 6 — Mode V2 : adresse lingotOr (address(0) = mode V1)
+      {
+        ...reserve,
+        functionName: "lingotOr",
+      },
     ],
     query: {
       enabled: !!address,
@@ -64,6 +69,9 @@ export function useDashboard() {
   const reserveStatus = data?.[5]?.result as readonly [
     bigint, bigint, bigint, bigint, bigint, boolean, boolean, bigint, bigint
   ] | undefined;
+  const lingotOrAddr = data?.[6]?.result as string | undefined;
+  const isV2Mode = lingotOrAddr !== undefined && 
+                   lingotOrAddr !== "0x0000000000000000000000000000000000000000";
 
   const price    = priceData?.[0];
   const isOracle = priceData?.[1] ?? false;
@@ -88,6 +96,12 @@ export function useDashboard() {
       pricePerOz: price !== undefined
         ? `$${(Number(price) / 1e8 * 31.1035).toFixed(2)}`
         : "—",
+      // Capitalisation = gldSupply (mg) * price ($/g, 8 décimales) / 1e5
+      // gldSupply en mg, price en 8 décimales par gramme
+      // (gldSupply * price) / 1e5 = valeur en USDC (6 décimales)
+      marketCapUsdc: (gldSupply !== undefined && price !== undefined)
+        ? (gldSupply * price) / 100000n
+        : undefined,  
     },
 
     // Réserve
@@ -101,12 +115,31 @@ export function useDashboard() {
       exchangePaused: reserveStatus?.[6] ?? false,
       price:          reserveStatus?.[7],
       deficitUsdc:    reserveStatus?.[8],
-      // Ratio formaté : 10000 bps = 100%
-      // MaxUint256 = supply GLD = 0 → afficher "∞" (sur-collatéralisé)
+      isV2Mode,       // ← nouveau
+      // Formatage réserve selon le mode
+      usdcReserveFormatted: (() => {
+        const v = reserveStatus?.[0];
+        if (v === undefined) return "—";
+        if (isV2Mode) {
+          // V2 : valeur en mg → convertir en grammes
+          return `${(Number(v) / 1000).toFixed(3)} g`;
+        }
+        // V1 : valeur en USDC (6 décimales)
+        return `${parseFloat(formatUnits(v, 6)).toFixed(2)} USDC`;
+      })(),
+      goldValueFormatted: (() => {
+        const v = reserveStatus?.[2];
+        if (v === undefined) return "—";
+        if (isV2Mode) {
+          // V2 : GLD supply en mg → convertir en grammes
+          return `${(Number(v) / 1000).toFixed(3)} g`;
+        }
+        // V1 : valeur en USDC (6 décimales)
+        return `${parseFloat(formatUnits(v, 6)).toFixed(2)} USDC`;
+      })(),
       ratioPercent: (() => {
         const r = reserveStatus?.[3];
         if (r === undefined) return "—";
-        // MaxUint256 ou valeur astronomique → supply = 0, ratio infini
         if (r > 100_000n) return "∞";
         return (Number(r) / 100).toFixed(1) + "%";
       })(),

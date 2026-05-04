@@ -57,6 +57,20 @@ export default function ReservePage() {
     query: { refetchInterval: 30_000 },
   });
 
+  // Total USDC dans Treasury (pour mode V2)
+  const { data: usdcTotal } = useReadContract({
+    ...treasury,
+    functionName: "totalDeposited",
+  });
+
+  // Détecter le mode V2
+  const { data: lingotOrAddr } = useReadContract({
+    ...reserve,
+    functionName: "lingotOr",
+  });
+  const isV2Mode = lingotOrAddr !== undefined && 
+                  lingotOrAddr !== "0x0000000000000000000000000000000000000000";
+
   const status = statusRaw as readonly [
     bigint, bigint, bigint, bigint, bigint, boolean, boolean, bigint, bigint
   ] | undefined;
@@ -170,18 +184,34 @@ export default function ReservePage() {
           <p className="text-xs text-muted-foreground">{t("min_required")} : {minRatioPercent}%</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5 space-y-2 text-center">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">{t("usdc_reserve")}</p>
-          <p className="text-2xl font-bold">
-            {usdcReserve !== undefined ? formatUnits(usdcReserve, 6) : "—"}
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">
+            {isV2Mode ? "Collatéral physique" : t("usdc_reserve")}
           </p>
-          <p className="text-xs text-muted-foreground">USDC</p>
+          <p className="text-2xl font-bold">
+            {usdcReserve !== undefined
+              ? isV2Mode
+                ? `${(Number(usdcReserve) / 1000).toFixed(3)}`
+                : formatUnits(usdcReserve, 6)
+              : "—"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {isV2Mode ? "grammes en coffre" : "USDC"}
+          </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5 space-y-2 text-center">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">{t("gold_value")}</p>
-          <p className="text-2xl font-bold">
-            {goldValueUsdc !== undefined ? formatUnits(goldValueUsdc, 6) : "—"}
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">
+            {isV2Mode ? "GLD en circulation" : t("gold_value")}
           </p>
-          <p className="text-xs text-muted-foreground">USDC</p>
+          <p className="text-2xl font-bold">
+            {goldValueUsdc !== undefined
+              ? isV2Mode
+                ? `${(Number(goldValueUsdc) / 1000).toFixed(3)}`
+                : formatUnits(goldValueUsdc, 6)
+              : "—"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {isV2Mode ? "grammes GLD" : "USDC"}
+          </p>
         </div>
       </div>
 
@@ -194,13 +224,19 @@ export default function ReservePage() {
         <DetailRow label={t("gold_price")}
           value={price !== undefined ? `$${(Number(price) / 1e8).toFixed(2)} / g` : "—"}
           highlight />
-        <DetailRow label={t("usdc_reserve")}
-          value={usdcReserve !== undefined ? `${formatUnits(usdcReserve, 6)} USDC` : "—"} />
-        <DetailRow label={t("gold_value")}
-          value={goldValueUsdc !== undefined ? `${formatUnits(goldValueUsdc, 6)} USDC` : "—"} />
+        <DetailRow label="Collatéral physique"
+          value={usdcReserve !== undefined
+            ? isV2Mode
+              ? `${(Number(usdcReserve) / 1000000).toFixed(3)} kg`
+              : `${formatUnits(usdcReserve, 6)} USDC`
+            : "—"} />
+        {isV2Mode && (
+          <DetailRow label="USDC en réserve"
+            value={usdcTotal !== undefined ? `${formatUnits(usdcTotal, 6)} USDC` : "—"} />
+        )}
         <DetailRow label={t("ratio")} value={`${ratioPercent}%`} highlight />
         <DetailRow label={t("min_ratio")} value={`${minRatioPercent}%`} />
-        <DetailRow label="Exchange" value={exchangePaused ? `⚠️ ${t("paused")}` : `✓ ${t("active")}`} /  >
+        <DetailRow label="Exchange" value={exchangePaused ? `⚠️ ${t("paused")}` : `✓ ${t("active")}`} />
       </div>
 
       {/* Actions */}
@@ -226,7 +262,7 @@ export default function ReservePage() {
         </div>
 
         {/* Recapitaliser — admin uniquement */}
-        {canRecapitalize && <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+        {canRecapitalize && !isV2Mode && <div className="rounded-xl border border-border bg-card p-6 space-y-4">
           <div>
             <h3 className="font-semibold">{t("recapitalize")}</h3>
             <p className="text-sm text-muted-foreground mt-1">

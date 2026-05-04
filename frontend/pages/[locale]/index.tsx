@@ -1,6 +1,7 @@
 import type { GetStaticPropsContext } from "next";
 import { useTranslations } from "next-intl";
 import { useAccount } from "wagmi";
+import { formatUnits } from "viem";
 import { useEffect, useState } from "react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { Badge } from "@/components/ui/badge";
@@ -123,25 +124,47 @@ export default function DashboardPage() {
       <div>
         <h2 className="text-lg font-semibold mb-4">{t("global_stats")}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* 1 — GLD en circulation */}
           <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
             <p className="text-xs text-muted-foreground">{t("gld_supply_title")}</p>
             <p className="text-lg font-semibold">{formatted.gldSupply} GLD</p>
-            <p className="text-xs text-muted-foreground">{Number(formatted.gldSupply !== "—" ? formatted.gldSupply : 0).toFixed(3)} {t("grams_tokenized")}</p>
+            <p className="text-xs text-muted-foreground">
+              {Number(formatted.gldSupply !== "—" ? formatted.gldSupply : 0).toFixed(3)} {t("grams_tokenized")}
+            </p>
           </div>
+
+          {/* 2 — Capitalisation boursière */}
           <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
-            <p className="text-xs text-muted-foreground">{t("usdc_reserve_title")}</p>
-            <p className="text-lg font-semibold">{formatted.usdcTotal} USDC</p>
-            <p className="text-xs text-muted-foreground">{t("total_deposited")}</p>
-          </div>
-          <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
-            <p className="text-xs text-muted-foreground">{t("gold_value_title")}</p>
+            <p className="text-xs text-muted-foreground">Capitalisation</p>
             <p className="text-lg font-semibold">
-              {reserve.goldValueUsdc !== undefined
-                ? `${parseFloat((Number(reserve.goldValueUsdc) / 1e6).toFixed(2))} USDC`
+              {formatted.marketCapUsdc !== undefined
+                ? `${parseFloat(formatUnits(formatted.marketCapUsdc, 6)).toFixed(2)} USDC`
                 : "—"
               }
             </p>
-            <p className="text-xs text-muted-foreground">{t("market_value")}</p>
+            <p className="text-xs text-muted-foreground">Valeur marchande des GLD</p>
+          </div>
+
+          {/* 3 — Collatéral physique (V2) ou USDC en réserve (V1) */}
+          <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
+            {reserve.isV2Mode ? (
+              <>
+                <p className="text-xs text-muted-foreground">Collatéral physique</p>
+                <p className="text-lg font-semibold">
+                  {reserve.usdcReserve !== undefined
+                    ? `${(Number(reserve.usdcReserve) / 1000000).toFixed(3)} kg`
+                    : "—"
+                  }
+                </p>
+                <p className="text-xs text-muted-foreground">Quantité d'or en collatéral</p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">{t("usdc_reserve_title")}</p>
+                <p className="text-lg font-semibold">{formatted.usdcTotal} USDC</p>
+                <p className="text-xs text-muted-foreground">{t("total_deposited")}</p>
+              </>
+            )}
           </div>
         </div>
       </div>
