@@ -1,0 +1,60 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-f42113bda7c3e0e3dfe55a9e5bc368b5ce646325",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.4.2"
+  },
+  "userSourceNameMap": {
+    "contracts/ReserveKeeper.sol": "project/contracts/ReserveKeeper.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": [
+        "project/:@chainlink/contracts/=npm/@chainlink/contracts@1.5.0/"
+      ]
+    },
+    "sources": {
+      "npm/@chainlink/contracts@1.5.0/src/v0.8/automation/AutomationBase.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract AutomationBase {\n  error OnlySimulatedBackend();\n\n  /**\n   * @notice method that allows it to be simulated via eth_call by checking that\n   * the sender is the zero address.\n   */\n  function _preventExecution() internal view {\n    // solhint-disable-next-line avoid-tx-origin\n    if (tx.origin != address(0) && tx.origin != address(0x1111111111111111111111111111111111111111)) {\n      revert OnlySimulatedBackend();\n    }\n  }\n\n  /**\n   * @notice modifier that allows it to be simulated via eth_call by checking\n   * that the sender is the zero address.\n   */\n  modifier cannotExecute() {\n    _preventExecution();\n    _;\n  }\n}\n"
+      },
+      "npm/@chainlink/contracts@1.5.0/src/v0.8/automation/AutomationCompatible.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport {AutomationBase} from \"./AutomationBase.sol\";\nimport {AutomationCompatibleInterface} from \"./interfaces/AutomationCompatibleInterface.sol\";\n\nabstract contract AutomationCompatible is AutomationBase, AutomationCompatibleInterface {}\n"
+      },
+      "npm/@chainlink/contracts@1.5.0/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n// solhint-disable-next-line interface-starts-with-i\ninterface AutomationCompatibleInterface {\n  /**\n   * @notice method that is simulated by the keepers to see if any work actually\n   * needs to be performed. This method does does not actually need to be\n   * executable, and since it is only ever simulated it can consume lots of gas.\n   * @dev To ensure that it is never called, you may want to add the\n   * cannotExecute modifier from KeeperBase to your implementation of this\n   * method.\n   * @param checkData specified in the upkeep registration so it is always the\n   * same for a registered upkeep. This can easily be broken down into specific\n   * arguments using `abi.decode`, so multiple upkeeps can be registered on the\n   * same contract and easily differentiated by the contract.\n   * @return upkeepNeeded boolean to indicate whether the keeper should call\n   * performUpkeep or not.\n   * @return performData bytes that the keeper should call performUpkeep with, if\n   * upkeep is needed. If you would like to encode data to decode later, try\n   * `abi.encode`.\n   */\n  function checkUpkeep(\n    bytes calldata checkData\n  ) external returns (bool upkeepNeeded, bytes memory performData);\n\n  /**\n   * @notice method that is actually executed by the keepers, via the registry.\n   * The data returned by the checkUpkeep simulation will be passed into\n   * this method to actually be executed.\n   * @dev The input to this method should not be trusted, and the caller of the\n   * method should not even be restricted to any single registry. Anyone should\n   * be able call it, and the input should be validated, there is no guarantee\n   * that the data passed in is the performData returned from checkUpkeep. This\n   * could happen due to malicious keepers, racing keepers, or simply a state\n   * change while the performUpkeep transaction is waiting for confirmation.\n   * Always validate the data passed in.\n   * @param performData is the data which was passed back from the checkData\n   * simulation. If it is encoded, it can easily be decoded into other types by\n   * calling `abi.decode`. This data should not be trusted, and should be\n   * validated against the contract's current state.\n   */\n  function performUpkeep(\n    bytes calldata performData\n  ) external;\n}\n"
+      },
+      "project/contracts/ReserveKeeper.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\n\nimport \"@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol\";\n\n// ─── Interface Reserve ────────────────────────────────────────────────────────\ninterface IReserve {\n    function proofOfReserve() external;\n    function isHealthy() external view returns (bool);\n    function lastCheckAt() external view returns (uint256);\n}\n\n/**\n * @title ReserveKeeper\n * @notice Contrat Chainlink Automation pour automatiser proofOfReserve()\n * @dev Appelle Reserve.proofOfReserve() si :\n *   1. Le délai minimum depuis le dernier check est écoulé (checkInterval)\n *   2. OU le ratio est insuffisant (urgence — appel immédiat)\n */\ncontract ReserveKeeper is AutomationCompatibleInterface {\n\n    // ─── State ────────────────────────────────────────────────────────────\n    IReserve public reserve;\n    address  public owner;\n    uint256  public checkInterval; // délai minimum entre deux checks (secondes)\n    uint256  public lastPerformedAt; // timestamp du dernier performUpkeep\n\n    // ─── Events ───────────────────────────────────────────────────────────\n    event UpkeepPerformed(uint256 timestamp, bool wasHealthy);\n    event IntervalUpdated(uint256 oldInterval, uint256 newInterval);\n    event ReserveUpdated(address oldReserve, address newReserve);\n    event OwnershipTransferred(address oldOwner, address newOwner);\n\n    // ─── Erreurs ──────────────────────────────────────────────────────────\n    error NotOwner();\n    error InvalidAddress();\n    error InvalidInterval();\n\n    // ─── Modifier ─────────────────────────────────────────────────────────\n    modifier onlyOwner() {\n        if (msg.sender != owner) revert NotOwner();\n        _;\n    }\n\n    // ─── Constructor ──────────────────────────────────────────────────────\n    constructor(address reserveAddr, uint256 interval) {\n        if (reserveAddr == address(0)) revert InvalidAddress();\n        if (interval == 0)            revert InvalidInterval();\n\n        reserve          = IReserve(reserveAddr);\n        checkInterval    = interval;\n        owner            = msg.sender;\n        lastPerformedAt  = 0;\n    }\n\n    // ─── Chainlink Automation ─────────────────────────────────────────────\n\n    /**\n     * @notice Chainlink vérifie si une action est nécessaire\n     * @return upkeepNeeded true si performUpkeep doit être appelé\n     * @return performData  données à passer à performUpkeep (vide ici)\n     */\n    function checkUpkeep(bytes calldata /* checkData */)\n        external\n        view\n        override\n        returns (bool upkeepNeeded, bytes memory performData)\n    {\n        bool intervalElapsed = (block.timestamp - lastPerformedAt) >= checkInterval;\n        bool isUnhealthy     = !reserve.isHealthy();\n\n        // Appeler si délai écoulé OU ratio insuffisant (urgence)\n        upkeepNeeded = intervalElapsed || isUnhealthy;\n        performData  = \"\";\n    }\n\n    /**\n     * @notice Chainlink exécute l'upkeep\n     * @dev Appelé uniquement si checkUpkeep retourne true\n     */\n    function performUpkeep(bytes calldata /* performData */)\n        external\n        override\n    {\n        // Double vérification — éviter les appels inutiles\n        bool intervalElapsed = (block.timestamp - lastPerformedAt) >= checkInterval;\n        bool isUnhealthy     = !reserve.isHealthy();\n\n        if (!intervalElapsed && !isUnhealthy) return;\n\n        bool wasHealthy  = reserve.isHealthy();\n        lastPerformedAt  = block.timestamp;\n\n        reserve.proofOfReserve();\n\n        emit UpkeepPerformed(block.timestamp, wasHealthy);\n    }\n\n    // ─── Admin (Safe uniquement) ──────────────────────────────────────────\n\n    function setCheckInterval(uint256 newInterval) external onlyOwner {\n        if (newInterval == 0) revert InvalidInterval();\n        emit IntervalUpdated(checkInterval, newInterval);\n        checkInterval = newInterval;\n    }\n\n    function setReserve(address newReserve) external onlyOwner {\n        if (newReserve == address(0)) revert InvalidAddress();\n        emit ReserveUpdated(address(reserve), newReserve);\n        reserve = IReserve(newReserve);\n    }\n\n    function transferOwnership(address newOwner) external onlyOwner {\n        if (newOwner == address(0)) revert InvalidAddress();\n        emit OwnershipTransferred(owner, newOwner);\n        owner = newOwner;\n    }\n}"
+      }
+    }
+  }
+}

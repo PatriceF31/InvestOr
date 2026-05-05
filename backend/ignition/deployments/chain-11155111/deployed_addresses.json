@@ -12,5 +12,6 @@
   "SerialNumberModule#SerialNumber": "0x20f2D421d4CD4D0Cef53C262328fCD2134478f53",
   "SerialNumberModule#SerialNumberProxy": "0x24622EfA10CfBA2B6F0e2845a89B09711293867d",
   "LingotOrModule#LingotOr": "0x73a95339328C3889cc4EaB16d7996626fcdd780a",
-  "LingotOrModule#InvestOrProxy": "0x69159BBd5EaFf05C381497890F02d78F1b595A83"
+  "LingotOrModule#InvestOrProxy": "0x69159BBd5EaFf05C381497890F02d78F1b595A83",
+  "ReserveKeeperModule#ReserveKeeper": "0x0F1F52138c93162538B61e80bEDfCd180e6fa5a1"
 }
