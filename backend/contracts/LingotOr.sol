@@ -77,6 +77,20 @@ contract LingotOr is
         uint256 proposedAt;
     }
 
+    struct MintProposalInput {
+        uint256 tokenId;
+        uint256 amount;
+        address to;
+        string  serialCode;
+    }
+
+    struct BurnProposalInput {
+        uint256 tokenId;
+        uint256 amount;
+        address from;
+        string  serialCode;
+    }
+
     // ─── State ────────────────────────────────────────────────────────────────
     ISerialNumber public serialNumber;
     string private _baseURI;
@@ -202,6 +216,46 @@ contract LingotOr is
         emit MintProposed(proposalId, tokenId, to, serialCode, msg.sender);
     }
 
+    /**
+    * @notice Le gardien propose plusieurs mints en une seule transaction
+    * @dev Tous les lingots partagent le même raffineur, gardien et origine
+    */
+    function proposeMintBatch(
+        MintProposalInput[] calldata inputs,
+        string calldata refiner,
+        string calldata supplier,
+        string calldata origin
+    ) external onlyRole(MINTER_ROLE) whenNotPaused returns (uint256[] memory proposalIds) {
+        uint256 len = inputs.length;
+        require(len > 0, "Empty batch");
+
+        proposalIds = new uint256[](len);
+
+        for (uint256 i = 0; i < len; i++) {
+            if (!validTokenIds[inputs[i].tokenId]) revert InvalidTokenId(inputs[i].tokenId);
+            if (inputs[i].amount == 0)             revert InvalidAmount();
+            if (inputs[i].to == address(0))        revert InvalidAddress();
+
+            uint256 proposalId = ++mintProposalCount;
+            mintProposals[proposalId] = MintProposal({
+                tokenId:    inputs[i].tokenId,
+                amount:     inputs[i].amount,
+                to:         inputs[i].to,
+                serialCode: inputs[i].serialCode,
+                refiner:    refiner,
+                supplier:   supplier,
+                origin:     origin,
+                executed:   false,
+                rejected:   false,
+                proposedBy: msg.sender,
+                proposedAt: block.timestamp
+            });
+
+            proposalIds[i] = proposalId;
+            emit MintProposed(proposalId, inputs[i].tokenId, inputs[i].to, inputs[i].serialCode, msg.sender);
+        }
+    }
+
     // ─── Approve Mint ─────────────────────────────────────────────────────────
     /**
      * @notice InvestOr (Safe) valide le mint après rapprochement BL/facture
@@ -226,6 +280,29 @@ contract LingotOr is
         serialNumber.generate(p.to);
 
         emit MintApproved(proposalId, p.tokenId, p.to, p.amount, p.serialCode);
+    }
+
+    /**
+    * @notice InvestOr (Safe) valide plusieurs mints en une seule transaction
+    */
+    function approveMintBatch(uint256[] calldata proposalIds)
+        external
+        onlyRole(VALIDATOR_ROLE)
+        nonReentrant
+        whenNotPaused
+    {
+        for (uint256 i = 0; i < proposalIds.length; i++) {
+            MintProposal storage p = mintProposals[proposalIds[i]];
+            if (p.proposedAt == 0) revert ProposalNotFound(proposalIds[i]);
+            if (p.executed)        revert ProposalAlreadyExecuted(proposalIds[i]);
+            if (p.rejected)        revert ProposalAlreadyRejected(proposalIds[i]);
+
+            p.executed = true;
+            _mint(p.to, p.tokenId, p.amount, "");
+            serialNumber.generate(p.to);
+
+            emit MintApproved(proposalIds[i], p.tokenId, p.to, p.amount, p.serialCode);
+        }
     }
 
     // ─── Reject Mint ──────────────────────────────────────────────────────────
@@ -276,6 +353,40 @@ contract LingotOr is
         emit BurnProposed(proposalId, tokenId, from, reason, msg.sender);
     }
 
+    function proposeBurnBatch(
+        BurnProposalInput[] calldata inputs,
+        string calldata reason
+    ) external onlyRole(MINTER_ROLE) whenNotPaused returns (uint256[] memory proposalIds) {
+        uint256 len = inputs.length;
+        require(len > 0, "Empty batch");
+
+        proposalIds = new uint256[](len);
+
+        for (uint256 i = 0; i < len; i++) {
+            if (!validTokenIds[inputs[i].tokenId]) revert InvalidTokenId(inputs[i].tokenId);
+            if (inputs[i].amount == 0)             revert InvalidAmount();
+            if (inputs[i].from == address(0))      revert InvalidAddress();
+            if (balanceOf(inputs[i].from, inputs[i].tokenId) < inputs[i].amount)
+                revert InsufficientBalance(inputs[i].from, inputs[i].tokenId, inputs[i].amount);
+
+            uint256 proposalId = ++burnProposalCount;
+            burnProposals[proposalId] = BurnProposal({
+                tokenId:    inputs[i].tokenId,
+                amount:     inputs[i].amount,
+                from:       inputs[i].from,
+                serialCode: inputs[i].serialCode,
+                reason:     reason,
+                executed:   false,
+                rejected:   false,
+                proposedBy: msg.sender,
+                proposedAt: block.timestamp
+            });
+
+            proposalIds[i] = proposalId;
+            emit BurnProposed(proposalId, inputs[i].tokenId, inputs[i].from, reason, msg.sender);
+        }
+    }
+
     // ─── Approve Burn ─────────────────────────────────────────────────────────
     function approveBurn(uint256 proposalId)
         external
@@ -301,6 +412,31 @@ contract LingotOr is
         } catch {}
 
         emit BurnApproved(proposalId, p.tokenId, p.from, p.amount, p.serialCode);
+    }
+
+    function approveBurnBatch(uint256[] calldata proposalIds)
+        external
+        onlyRole(VALIDATOR_ROLE)
+        nonReentrant
+        whenNotPaused
+    {
+        for (uint256 i = 0; i < proposalIds.length; i++) {
+            BurnProposal storage p = burnProposals[proposalIds[i]];
+            if (p.proposedAt == 0) revert ProposalNotFound(proposalIds[i]);
+            if (p.executed)        revert ProposalAlreadyExecuted(proposalIds[i]);
+            if (p.rejected)        revert ProposalAlreadyRejected(proposalIds[i]);
+
+            p.executed = true;
+            _burn(p.from, p.tokenId, p.amount);
+
+            try serialNumber.getSerialByCode(p.serialCode) returns (
+                uint256 serialId, string memory, address, bool active, uint256
+            ) {
+                if (active) serialNumber.deactivate(serialId);
+            } catch {}
+
+            emit BurnApproved(proposalIds[i], p.tokenId, p.from, p.amount, p.serialCode);
+        }
     }
 
     // ─── Reject Burn ──────────────────────────────────────────────────────────

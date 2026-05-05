@@ -5,27 +5,29 @@ import "dotenv/config";
 export default defineConfig({
   plugins: [hardhatToolboxMochaEthersPlugin],
   solidity: {
-    profiles: {
-      default: {
-        version: "0.8.28",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 200,
+      profiles: {
+        default: {
+          version: "0.8.28",
+          settings: {
+            optimizer: {
+              enabled: true,
+              runs: 200,
+            },
+            viaIR: true,
           },
         },
-      },
-      production: {
-        version: "0.8.28",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 200,
+        production: {
+          version: "0.8.28",
+          settings: {
+            optimizer: {
+              enabled: true,
+              runs: 200,
+            },
+            viaIR: true,
           },
         },
       },
     },
-  },
   networks: {
     hardhatMainnet: {
       type: "edr-simulated",
