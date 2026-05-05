@@ -1,0 +1,58 @@
+/**
+ * @file upgrades/upgrade-exchange.ts
+ * @description Upgrade du contrat Exchange
+ * ⚠️  Exchange est owné par Reserve — l'upgrade passe par Reserve.upgradeExchange()
+ * Usage : npx hardhat run scripts/upgrades/upgrade-exchange.ts --network sepolia
+ */
+import { network } from "hardhat";
+
+const PROXY_EXCHANGE = "0x69C73469C427A9adbFA9a54E5a7711746A34d508";
+const PROXY_RESERVE  = "0x130A6A02eee28C4f9A5b01B854ce4aE7BE7D65Ce";
+
+const RESERVE_ABI = [
+  "function upgradeExchange(address newImpl) external",
+  "function owner() view returns (address)",
+];
+
+async function main() {
+  const { ethers } = await network.connect();
+  const [deployer] = await ethers.getSigners();
+
+  console.log("\n═══════════════════════════════════════════════════════");
+  console.log("  InvestOr — Upgrade Exchange (via Reserve)");
+  console.log(`  Proxy Exchange : ${PROXY_EXCHANGE}`);
+  console.log(`  Proxy Reserve  : ${PROXY_RESERVE}`);
+  console.log(`  Wallet         : ${deployer.address}`);
+  console.log("═══════════════════════════════════════════════════════\n");
+
+  process.stdout.write("  Déploiement nouvelle impl Exchange... ");
+  const factory = await ethers.getContractFactory("Exchange", deployer);
+  const impl = await factory.deploy();
+  await impl.waitForDeployment();
+  const implAddr = await impl.getAddress();
+  console.log(`✅  ${implAddr}`);
+
+  // Reserve est owné par le Safe — upgrade via Safe si nécessaire
+  const reserve = new ethers.Contract(PROXY_RESERVE, RESERVE_ABI, deployer);
+  const reserveOwner = await reserve.owner();
+
+  if (reserveOwner.toLowerCase() === deployer.address.toLowerCase()) {
+    process.stdout.write("  upgradeExchange (via Reserve)... ");
+    const tx = await reserve.upgradeExchange(implAddr);
+    await tx.wait();
+    console.log("✅");
+  } else {
+    console.log(`  ⚠️  Reserve est owné par : ${reserveOwner}`);
+    console.log("  ℹ️  Finaliser via Safe :");
+    console.log(`     → Adresse : ${PROXY_RESERVE} (Reserve)`);
+    console.log(`     → Fonction : upgradeExchange`);
+    console.log(`     → newImpl  : ${implAddr}`);
+  }
+
+  console.log("\n═══════════════════════════════════════════════════════");
+  console.log("  ✅ Nouvelle impl Exchange déployée");
+  console.log(`  ℹ️  Nouvelle impl : ${implAddr}`);
+  console.log("═══════════════════════════════════════════════════════\n");
+}
+
+main().catch(console.error);

@@ -1,12 +1,11 @@
 /**
- * @file upgrades/upgrade-lingot.ts
- * @description Upgrade du contrat LingotOr
- * ⚠️  LingotOr est owné par le Safe — le script déploie l'impl et affiche les instructions Safe
- * Usage : npx hardhat run scripts/upgrades/upgrade-lingot.ts --network sepolia
+ * @file upgrades/upgrade-serialnumber.ts
+ * @description Upgrade du contrat SerialNumber
+ * Usage : npx hardhat run scripts/upgrades/upgrade-serialnumber.ts --network sepolia
  */
 import { network } from "hardhat";
 
-const PROXY = "0x69159BBd5EaFf05C381497890F02d78F1b595A83";
+const PROXY = "0x24622EfA10CfBA2B6F0e2845a89B09711293867d";
 const UUPS_ABI = [
   "function upgradeToAndCall(address, bytes) external",
   "function owner() view returns (address)",
@@ -17,13 +16,13 @@ async function main() {
   const [deployer] = await ethers.getSigners();
 
   console.log("\n═══════════════════════════════════════════════════════");
-  console.log("  InvestOr — Upgrade LingotOr");
+  console.log("  InvestOr — Upgrade SerialNumber");
   console.log(`  Proxy  : ${PROXY}`);
   console.log(`  Wallet : ${deployer.address}`);
   console.log("═══════════════════════════════════════════════════════\n");
 
   process.stdout.write("  Déploiement nouvelle impl... ");
-  const factory = await ethers.getContractFactory("LingotOr", deployer);
+  const factory = await ethers.getContractFactory("SerialNumber", deployer);
   const impl = await factory.deploy();
   await impl.waitForDeployment();
   const implAddr = await impl.getAddress();
@@ -37,9 +36,9 @@ async function main() {
     const tx = await proxy.upgradeToAndCall(implAddr, "0x");
     await tx.wait();
     console.log("✅");
-    console.log("\n  ✅ LingotOr upgradé avec succès");
+    console.log("\n  ✅ SerialNumber upgradé avec succès");
   } else {
-    console.log(`\n  ⚠️  LingotOr est owné par le Safe : ${owner}`);
+    console.log(`\n  ⚠️  SerialNumber est owné par le Safe : ${owner}`);
     console.log("  ℹ️  Finaliser via app.safe.global :");
     console.log(`     → Adresse : ${PROXY}`);
     console.log(`     → Fonction : upgradeToAndCall`);

@@ -1,12 +1,11 @@
 /**
- * @file upgrades/upgrade-lingot.ts
- * @description Upgrade du contrat LingotOr
- * ⚠️  LingotOr est owné par le Safe — le script déploie l'impl et affiche les instructions Safe
- * Usage : npx hardhat run scripts/upgrades/upgrade-lingot.ts --network sepolia
+ * @file upgrades/upgrade-treasury.ts
+ * @description Upgrade du contrat Treasury
+ * Usage : npx hardhat run scripts/upgrades/upgrade-treasury.ts --network sepolia
  */
 import { network } from "hardhat";
 
-const PROXY = "0x69159BBd5EaFf05C381497890F02d78F1b595A83";
+const PROXY = "0xcCb3508f3Dc41e0AeE7FFedB0f410aB555Ff40af";
 const UUPS_ABI = [
   "function upgradeToAndCall(address, bytes) external",
   "function owner() view returns (address)",
@@ -17,38 +16,27 @@ async function main() {
   const [deployer] = await ethers.getSigners();
 
   console.log("\n═══════════════════════════════════════════════════════");
-  console.log("  InvestOr — Upgrade LingotOr");
+  console.log("  InvestOr — Upgrade Treasury");
   console.log(`  Proxy  : ${PROXY}`);
   console.log(`  Wallet : ${deployer.address}`);
   console.log("═══════════════════════════════════════════════════════\n");
 
   process.stdout.write("  Déploiement nouvelle impl... ");
-  const factory = await ethers.getContractFactory("LingotOr", deployer);
+  const factory = await ethers.getContractFactory("Treasury", deployer);
   const impl = await factory.deploy();
   await impl.waitForDeployment();
   const implAddr = await impl.getAddress();
   console.log(`✅  ${implAddr}`);
 
+  process.stdout.write("  upgradeToAndCall... ");
   const proxy = new ethers.Contract(PROXY, UUPS_ABI, deployer);
-  const owner = await proxy.owner();
+  const tx = await proxy.upgradeToAndCall(implAddr, "0x");
+  await tx.wait();
+  console.log("✅");
 
-  if (owner.toLowerCase() === deployer.address.toLowerCase()) {
-    process.stdout.write("  upgradeToAndCall... ");
-    const tx = await proxy.upgradeToAndCall(implAddr, "0x");
-    await tx.wait();
-    console.log("✅");
-    console.log("\n  ✅ LingotOr upgradé avec succès");
-  } else {
-    console.log(`\n  ⚠️  LingotOr est owné par le Safe : ${owner}`);
-    console.log("  ℹ️  Finaliser via app.safe.global :");
-    console.log(`     → Adresse : ${PROXY}`);
-    console.log(`     → Fonction : upgradeToAndCall`);
-    console.log(`     → newImplementation : ${implAddr}`);
-    console.log(`     → data : 0x`);
-    console.log(`     → ETH value : 0`);
-  }
-
-  console.log(`\n  ℹ️  Nouvelle impl : ${implAddr}`);
+  console.log("\n═══════════════════════════════════════════════════════");
+  console.log("  ✅ Treasury upgradé avec succès");
+  console.log(`  ℹ️  Nouvelle impl : ${implAddr}`);
   console.log("═══════════════════════════════════════════════════════\n");
 }
 
