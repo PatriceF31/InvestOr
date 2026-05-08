@@ -6,7 +6,7 @@ import { formatUnits, parseUnits } from "viem";
 import { useContracts } from "@/hooks/useContracts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+//import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Shield, RefreshCw, AlertTriangle, CheckCircle, Loader2, TrendingDown } from "lucide-react";
@@ -185,7 +185,7 @@ export default function ReservePage() {
         </div>
         <div className="rounded-xl border border-border bg-card p-5 space-y-2 text-center">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            {isV2Mode ? "Collatéral physique" : t("usdc_reserve")}
+            {isV2Mode ? t("physical_collateral") : t("usdc_reserve")}
           </p>
           <p className="text-2xl font-bold">
             {usdcReserve !== undefined
@@ -195,12 +195,12 @@ export default function ReservePage() {
               : "—"}
           </p>
           <p className="text-xs text-muted-foreground">
-            {isV2Mode ? "grammes en coffre" : "USDC"}
+            {isV2Mode ? t("vault_grams") : "USDC"}
           </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5 space-y-2 text-center">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            {isV2Mode ? "GLD en circulation" : t("gold_value")}
+            {isV2Mode ? t("gld_supply") : t("gold_value")}
           </p>
           <p className="text-2xl font-bold">
             {goldValueUsdc !== undefined
@@ -210,7 +210,7 @@ export default function ReservePage() {
               : "—"}
           </p>
           <p className="text-xs text-muted-foreground">
-            {isV2Mode ? "grammes GLD" : "USDC"}
+            {isV2Mode ? t("gld_to_gram") : "USDC"}
           </p>
         </div>
       </div>
@@ -224,14 +224,14 @@ export default function ReservePage() {
         <DetailRow label={t("gold_price")}
           value={price !== undefined ? `$${(Number(price) / 1e8).toFixed(2)} / g` : "—"}
           highlight />
-        <DetailRow label="Collatéral physique"
+        <DetailRow label={t("physical_collateral")}
           value={usdcReserve !== undefined
             ? isV2Mode
               ? `${(Number(usdcReserve) / 1000000).toFixed(3)} kg`
               : `${formatUnits(usdcReserve, 6)} USDC`
             : "—"} />
         {isV2Mode && (
-          <DetailRow label="USDC en réserve"
+          <DetailRow label={t("usdc_reserve")}
             value={usdcTotal !== undefined ? `${formatUnits(usdcTotal, 6)} USDC` : "—"} />
         )}
         <DetailRow label={t("ratio")} value={`${ratioPercent}%`} highlight />

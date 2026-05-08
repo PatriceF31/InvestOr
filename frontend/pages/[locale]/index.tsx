@@ -135,28 +135,28 @@ export default function DashboardPage() {
 
           {/* 2 — Capitalisation boursière */}
           <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
-            <p className="text-xs text-muted-foreground">Capitalisation</p>
+            <p className="text-xs text-muted-foreground">{t("marketcap")}</p>
             <p className="text-lg font-semibold">
               {formatted.marketCapUsdc !== undefined
                 ? `${parseFloat(formatUnits(formatted.marketCapUsdc, 6)).toFixed(2)} USDC`
                 : "—"
               }
             </p>
-            <p className="text-xs text-muted-foreground">Valeur marchande des GLD</p>
+            <p className="text-xs text-muted-foreground">{t("market_value")}</p>
           </div>
 
           {/* 3 — Collatéral physique (V2) ou USDC en réserve (V1) */}
           <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
             {reserve.isV2Mode ? (
               <>
-                <p className="text-xs text-muted-foreground">Collatéral physique</p>
+                <p className="text-xs text-muted-foreground">{t("physical_collateral")}</p>
                 <p className="text-lg font-semibold">
                   {reserve.usdcReserve !== undefined
                     ? `${(Number(reserve.usdcReserve) / 1000000).toFixed(3)} kg`
                     : "—"
                   }
                 </p>
-                <p className="text-xs text-muted-foreground">Quantité d'or en collatéral</p>
+                <p className="text-xs text-muted-foreground">{t("physical_gold_quantity")}</p>
               </>
             ) : (
               <>

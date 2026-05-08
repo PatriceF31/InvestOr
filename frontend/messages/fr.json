@@ -6,7 +6,8 @@
     "history": "Historique",
     "reserve": "Réserve",
     "admin": "Administration",
-    "price": "Prix de l'or"
+    "price": "Prix de l'or",
+    "ingot": "Lingot"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -26,7 +27,10 @@
     "gld_supply_title": "GLD en circulation",
     "usdc_reserve_title": "USDC en réserve",
     "gold_value_title": "Valeur or (USDC)",
-    "refresh": "Rafraîchir"
+    "refresh": "Rafraîchir",
+    "marketcap": "Capitalisation boursière",
+    "physical_collateral": "Collatéral physique",
+    "physical_gold_quantity": "Quantité d'or en collatéral"
   },
   "trade": {
     "title": "Acheter / Vendre GLD",
@@ -72,7 +76,7 @@
     "inject_usdc0": "Injecter USDC pour recapitaliser",
     "gold_price": "Prix de l'or",
     "proof_of_reserve": "Vérifier la réserve",
-    "usdc_reserve": "Réserve USDC",
+    "usdc_reserve": "Réserve en USDC",
     "gld_supply": "GLD en circulation",
     "gold_value": "Valeur or (USDC)",
     "ratio": "Ratio de collatéralisation",
@@ -81,7 +85,10 @@
     "recapitalize": "Recapitaliser",
     "last_check": "Dernier contrôle",
     "status_healthy": "Sain",
-    "status_at_risk": "En risque"
+    "status_at_risk": "En risque",
+    "physical_collateral": "Collatéral physique",
+    "vault_grams": "grammes en coffre",
+    "gld_to_gram": "1 GLD = 1 gramme"
   },
   "history": {
     "title": "Historique des opérations",
@@ -142,5 +149,8 @@
     "source_api": "Source : API (fallback)",
     "last_update": "Dernière mise à jour",
     "refresh": "Rafraîchir"
+  },
+  "lingots": {
+    "ingot_manage":"Gestion des lingots"
   }
 }

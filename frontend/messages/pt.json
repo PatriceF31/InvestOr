@@ -7,6 +7,7 @@
     "reserve": "Reserva",
     "admin": "Administração",
     "price": "Preço do ouro",
+    "ingot": "Lingote",
     "connect_wallet_hint": "Conecte a sua carteira para ver os seus dados",
     "in_your_wallet": "Na sua carteira",
     "global_stats": "Estatísticas globais",
@@ -32,7 +33,10 @@
     "gld_supply_title": "GLD em circulação",
     "usdc_reserve_title": "USDC em reserva",
     "gold_value_title": "Valor ouro (USDC)",
-    "refresh": "Atualizar"
+    "refresh": "Atualizar",
+    "marketcap": "Capitalização de mercado",
+    "physical_collateral": "Colateral físico",
+    "physical_gold_quantity": "Quantidade de ouro como colateral"
   },
   "trade": {
     "title": "Comprar / Vender GLD",
@@ -78,7 +82,7 @@
     "inject_usdc0": "Injetar USDC para recapitalizar",
     "gold_price": "Preço do ouro",
     "proof_of_reserve": "Verificar reserva",
-    "usdc_reserve": "Reserva USDC",
+    "usdc_reserve": "Reserva em USDC",
     "gld_supply": "GLD em circulação",
     "gold_value": "Valor ouro (USDC)",
     "ratio": "Rácio de colateralização",
@@ -87,7 +91,10 @@
     "recapitalize": "Recapitalizar",
     "last_check": "Última verificação",
     "status_healthy": "Saudável",
-    "status_at_risk": "Em risco"
+    "status_at_risk": "Em risco",
+    "physical_collateral": "Colateral físico",
+    "vault_grams": "gramas no cofre",
+    "gld_to_gram": "1 GLD = 1 grama"
   },
   "history": {
     "title": "Histórico de operações",
@@ -148,5 +155,8 @@
     "source_api": "Fonte: API (fallback)",
     "last_update": "Última atualização",
     "refresh": "Atualizar"
+  },
+  "lingots": {
+    "ingot_manage":"Gestão dos lingotes"
   }
 }

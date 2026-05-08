@@ -19,7 +19,7 @@ const PUBLIC_LINKS = [
 
 // Liens gardiens/validateurs
 const GARDIEN_LINKS = [
-  { key: "lingots", href: "/lingots" },
+  { key: "ingot", href: "/lingots" },
 ];
 
 // Liens admin — visibles uniquement par le owner
