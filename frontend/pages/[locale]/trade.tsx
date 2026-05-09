@@ -406,6 +406,89 @@ function SellPanel() {
   );
 }
 
+// ── Panneau Cashback ──────────────────────────────────────────────────────────
+function CashbackPanel() {
+  const { address } = useAccount();
+  const { exchange } = useContracts();
+  const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
+  const [txState, setTxState] = useState<TxState>("idle");
+  const { writeContractAsync } = useWriteContract();
+  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash: txHash });
+
+  const { data: preview, refetch } = useReadContract({
+    ...exchange,
+    functionName: "previewCashback",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const cashback  = preview as [bigint, bigint, boolean] | undefined;
+  const amount    = cashback?.[0];
+  const fees      = cashback?.[1];
+  const eligible  = cashback?.[2] ?? false;
+
+  const handleClaim = async () => {
+    try {
+      setTxState("pending");
+      const tx = await writeContractAsync({
+        ...exchange,
+        functionName: "claimCashback",
+      });
+      setTxState("confirming");
+      setTxHash(tx);
+      setTxState("success");
+      refetch();
+    } catch {
+      setTxState("error");
+    }
+  };
+
+  const isLoading = txState === "pending" || txState === "confirming" || isConfirming;
+
+  if (!address) return null;
+  if (amount === 0n && fees === 0n) return null;
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+      <div className="flex items-center gap-2">
+        <span className="text-lg">🎁</span>
+        <h3 className="font-semibold">Cashback disponible</h3>
+        {eligible
+          ? <Badge variant="default" className="text-xs">Éligible</Badge>
+          : <Badge variant="outline" className="text-xs">Inactif &gt; 6 mois</Badge>
+        }
+      </div>
+      <Separator />
+      <div className="space-y-2">
+        <DetailRow
+          label="Frais cumulés (24 mois)"
+          value={fees !== undefined ? `${parseFloat(formatUnits(fees, 6)).toFixed(4)} USDC` : "—"}
+        />
+        <DetailRow
+          label="Cashback (0.5%)"
+          value={amount !== undefined ? `${parseFloat(formatUnits(amount, 6)).toFixed(4)} USDC` : "—"}
+        />
+      </div>
+      {!eligible && (
+        <p className="text-xs text-muted-foreground">
+          Vous devez avoir effectué au moins un achat ou une vente dans les 6 derniers mois pour réclamer votre cashback.
+        </p>
+      )}
+      <TxStatus state={txState} hash={txHash} />
+      <Button
+        className="w-full"
+        disabled={!eligible || !amount || amount === 0n || isLoading}
+        onClick={handleClaim}
+      >
+        {isLoading
+          ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />En cours...</>
+          : `Réclamer ${amount !== undefined ? parseFloat(formatUnits(amount, 6)).toFixed(4) : "0"} USDC`
+        }
+      </Button>
+    </div>
+  );
+}
+
 // ── Page Trade ────────────────────────────────────────────────────────────────
 export default function TradePage() {
   const t = useTranslations("trade");
@@ -450,6 +533,9 @@ export default function TradePage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Panneau cashback */}
+      <CashbackPanel />
 
       {/* Note légale */}
       <p className="text-center text-xs text-muted-foreground px-4">{t("irreversible_trade")}</p>
