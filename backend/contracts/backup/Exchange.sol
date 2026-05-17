@@ -21,19 +21,6 @@ interface AggregatorV3Interface {
     function decimals() external view returns (uint8);
 }
 
-/// @dev Interface minimale Tellor
-/// @notice Tellor retourne le prix en USD avec 18 décimales — conversion nécessaire vers 8 dec
-interface ITellorOracle {
-    /// @param _queryId  keccak256 de la query ABI-encodée (ex: SpotPrice "xau" "usd")
-    /// @param _timestamp Timestamp avant lequel chercher la valeur (block.timestamp pour le plus récent)
-    /// @return _value     Valeur encodée en bytes (abi.encode(uint256))
-    /// @return _timestampRetrieved Timestamp de la valeur trouvée (0 si aucune)
-    function getDataBefore(bytes32 _queryId, uint256 _timestamp)
-        external
-        view
-        returns (bytes memory _value, uint256 _timestampRetrieved);
-}
-
 /// @dev Interface minimale GLD
 interface IGLD {
     function mint(address to, uint256 amount) external;
@@ -50,28 +37,27 @@ interface ITreasury {
 }
 
 /// @title Exchange — Achat et vente de GLD contre USDC
-/// @notice Prix via oracle multi-sources (Chainlink + Tellor) avec fallback owner
+/// @notice Prix via Chainlink XAU/USD avec fallback owner
 /// @dev UUPS upgradeable — nécessite d'être approuvé comme minter sur GLD
 contract Exchange is
     Initializable,
     OwnableUpgradeable,
     PausableUpgradeable,
-    ReentrancyGuard,
+    ReentrancyGuard,  
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
 
     // ─── Storage ─────────────────────────────────────────────────────────────
 
-    IGLD      public gld;
+    IGLD     public gld;
     ITreasury public treasury;
-    IERC20    public usdc;
+    IERC20   public usdc;
 
     /// @dev Oracle Chainlink XAU/USD (peut être address(0) si non disponible)
     AggregatorV3Interface public priceOracle;
 
-    /// @dev Prix fallback en USD par gramme d'or, 8 décimales
-    /// @notice Exemple : 14750_00000000 = $147.50/g (soit ~$4 590/once)
+    /// @dev Prix fallback en USD par gramme d'or, 8 décimales (ex: 9000_00000000 = $90 000/kg = $90/g)
     uint256 public fallbackPrice;
 
     /// @dev Durée max de fraîcheur des données oracle (défaut: 1 heure)
@@ -85,36 +71,12 @@ contract Exchange is
 
     uint256 public constant BASIS_POINTS = 10_000;
 
-    // ─── Cashback storage (déclaré ici pour respecter l'ordre des slots) ─────
-
-    uint256 public deployedAt;                         // slot 9
-    mapping(address => uint256[8]) public feesBySlot;  // slot 10 — frais par semestre (8 slots = 4 ans)
-    mapping(address => uint256)    public lastActivityAt; // slot 11 — dernière tx buy/sell
-    uint256 public cashbackBps;                        // slot 12 — taux cashback (50 = 0.5%)
-
-    // ─── Oracle multi-sources — slot 13 ──────────────────────────────────────
-
-    /// @dev Oracle Tellor (peut être address(0) si non configuré)
-    /// @notice Sur Sepolia : écarté automatiquement par le staleness check (pas de reporters actifs)
-    /// @notice Sur Mainnet : feed XAU/USD actif, utilisé en médiane avec Chainlink
-    ITellorOracle public tellorOracle;
-
-    /// @dev QueryId Tellor pour XAU/USD — SpotPrice("xau","usd")
-    /// @notice keccak256(abi.encode("SpotPrice", abi.encode("xau","usd")))
-    bytes32 public constant TELLOR_XAU_USD_QUERY_ID =
-        0x5c13cd9c97dbb98f2429c101a2a8150e6c7a0ddaff6124ee176a3a411067ded0;
-
-    /// @dev Facteur de conversion Tellor → 8 décimales
-    /// @notice Tellor retourne 18 décimales, Chainlink retourne 8 décimales
-    uint256 public constant TELLOR_DECIMALS_FACTOR = 1e10; // 1e18 / 1e8
-
     // ─── Events ──────────────────────────────────────────────────────────────
 
     event TokensBought(address indexed buyer, uint256 usdcAmount, uint256 gldAmount, uint256 price);
     event TokensSold(address indexed seller, uint256 gldAmount, uint256 usdcAmount, uint256 price);
     event FallbackPriceUpdated(uint256 oldPrice, uint256 newPrice);
     event OracleUpdated(address indexed oldOracle, address indexed newOracle);
-    event TellorOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event OracleMaxAgeUpdated(uint256 oldMaxAge, uint256 newMaxAge);
     event FeeBpsUpdated(uint256 oldFee, uint256 newFee);
     event FeeCollectorUpdated(address indexed oldCollector, address indexed newCollector);
@@ -139,7 +101,12 @@ contract Exchange is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
 
-    /// @notice Initialise l'Exchange (inchangé — pas de tellorOracle à l'init, configuré via setTellorOracle)
+    /// @notice Initialise l'Exchange
+    /// @param initialOwner  Propriétaire
+    /// @param gldAddress    Adresse du proxy GLD
+    /// @param treasuryAddress Adresse du proxy Treasury
+    /// @param oracleAddress Adresse Chainlink XAU/USD (address(0) = oracle désactivé)
+    /// @param initFallbackPrice Prix fallback initial (8 décimales, ex: 9000_00000000)
     function initialize(
         address initialOwner,
         address gldAddress,
@@ -147,8 +114,8 @@ contract Exchange is
         address oracleAddress,
         uint256 initFallbackPrice
     ) external initializer {
-        if (initialOwner    == address(0)) revert ZeroAddress();
-        if (gldAddress      == address(0)) revert ZeroAddress();
+        if (initialOwner   == address(0)) revert ZeroAddress();
+        if (gldAddress     == address(0)) revert ZeroAddress();
         if (treasuryAddress == address(0)) revert ZeroAddress();
         if (initFallbackPrice == 0) revert ZeroAmount();
 
@@ -172,89 +139,25 @@ contract Exchange is
 
     // ─── Prix ────────────────────────────────────────────────────────────────
 
-    /// @notice Tente de lire le prix Chainlink XAU/USD
-    /// @return price    Prix en USD/gramme, 8 décimales (0 si indisponible ou périmé)
-    /// @return valid    true si le prix est utilisable
-    function _getChainlinkPrice() internal view returns (uint256 price, bool valid) {
-        if (address(priceOracle) == address(0)) return (0, false);
-        try priceOracle.latestRoundData() returns (
-            uint80,
-            int256 answer,
-            uint256,
-            uint256 updatedAt,
-            uint80
-        ) {
-            if (answer > 0 && block.timestamp - updatedAt <= oracleMaxAge) {
-                return (uint256(answer), true);
-            }
-        } catch {}
-        return (0, false);
-    }
-
-    /// @notice Tente de lire le prix Tellor XAU/USD
-    /// @return price    Prix en USD/gramme, 8 décimales (0 si indisponible ou périmé)
-    /// @return valid    true si le prix est utilisable
-    /// @dev Tellor retourne 18 décimales — divisé par TELLOR_DECIMALS_FACTOR pour avoir 8 dec
-    function _getTellorPrice() internal view returns (uint256 price, bool valid) {
-        if (address(tellorOracle) == address(0)) return (0, false);
-        try tellorOracle.getDataBefore(TELLOR_XAU_USD_QUERY_ID, block.timestamp) returns (
-            bytes memory value,
-            uint256 timestampRetrieved
-        ) {
-            if (
-                value.length > 0 &&
-                timestampRetrieved > 0 &&
-                block.timestamp - timestampRetrieved <= oracleMaxAge
-            ) {
-                uint256 rawPrice = abi.decode(value, (uint256));
-                // Tellor = 18 dec, on cible 8 dec (cohérent avec Chainlink)
-                uint256 converted = rawPrice / TELLOR_DECIMALS_FACTOR;
-                if (converted > 0) return (converted, true);
-            }
-        } catch {}
-        return (0, false);
-    }
-
-    /// @notice Retourne le prix actif selon la logique multi-sources
-    /// @dev Priorité : médiane Chainlink+Tellor > Chainlink seul > Tellor seul > fallback
+    /// @notice Retourne le prix actif (oracle si disponible, sinon fallback)
     /// @return price    Prix en USD par gramme, 8 décimales
-    /// @return source   0 = médiane, 1 = Chainlink seul, 2 = Tellor seul, 3 = fallback
-    function getPrice() public view returns (uint256 price, uint8 source) {
-        (uint256 chainlinkPrice, bool chainlinkOk) = _getChainlinkPrice();
-        (uint256 tellorPrice,    bool tellorOk)    = _getTellorPrice();
-
-        if (chainlinkOk && tellorOk) {
-            // Médiane des deux sources — résistant à la manipulation d'un oracle unique
-            price  = (chainlinkPrice + tellorPrice) / 2;
-            source = 0;
-            return (price, source);
+    /// @return isOracle true si le prix vient de l'oracle
+    function getPrice() public view returns (uint256 price, bool isOracle) {
+        if (address(priceOracle) != address(0)) {
+            try priceOracle.latestRoundData() returns (
+                uint80,
+                int256 answer,
+                uint256,
+                uint256 updatedAt,
+                uint80
+            ) {
+                if (answer > 0 && block.timestamp - updatedAt <= oracleMaxAge) {
+                    return (uint256(answer), true);
+                }
+            } catch {}
         }
-
-        if (chainlinkOk) {
-            return (chainlinkPrice, 1);
-        }
-
-        if (tellorOk) {
-            return (tellorPrice, 2);
-        }
-
-        // Aucun oracle valide — fallback owner
         if (fallbackPrice == 0) revert NoPriceAvailable();
-        return (fallbackPrice, 3);
-    }
-
-    /// @notice Retourne un résumé de l'état des oracles (utile pour le frontend et les tests)
-    function getOracleStatus() external view returns (
-        uint256 chainlinkPrice,
-        bool    chainlinkOk,
-        uint256 tellorPrice,
-        bool    tellorOk,
-        uint256 activePrice,
-        uint8   activeSource  // 0=médiane, 1=Chainlink, 2=Tellor, 3=fallback
-    ) {
-        (chainlinkPrice, chainlinkOk) = _getChainlinkPrice();
-        (tellorPrice,    tellorOk)    = _getTellorPrice();
-        (activePrice, activeSource)   = getPrice();
+        return (fallbackPrice, false);
     }
 
     // ─── Preview ─────────────────────────────────────────────────────────────
@@ -265,10 +168,12 @@ contract Exchange is
     function previewBuy(uint256 usdcAmount) public view returns (uint256 gldAmount) {
         if (usdcAmount == 0) revert ZeroAmount();
         (uint256 price, ) = getPrice();
-
+        
+        // Calcul des frais AVANT de calculer les GLD
         uint256 feeAmount = (usdcAmount * feeBps) / BASIS_POINTS;
         uint256 netAmount = usdcAmount - feeAmount;
-
+        
+        // GLD calculés sur le montant NET (correction du bug)
         gldAmount = (netAmount * 1e5) / price;
     }
 
@@ -279,16 +184,16 @@ contract Exchange is
         if (gldAmount == 0) revert ZeroAmount();
         (uint256 price, ) = getPrice();
         uint256 grossAmount = (gldAmount * price) / 1e5;
-
+        
+        // Déduire les frais du montant brut
         uint256 feeAmount = (grossAmount * feeBps) / BASIS_POINTS;
         usdcAmount = grossAmount - feeAmount;
     }
-
     // ─── Achat ───────────────────────────────────────────────────────────────
 
     /// @notice Achète des GLD en déposant des USDC dans le Treasury
     /// @dev L'utilisateur doit avoir approuvé usdc.approve(exchange, usdcAmount)
-    function buy(uint256 usdcAmount) external whenNotPaused nonReentrant {
+    function buy(uint256 usdcAmount) external whenNotPaused  nonReentrant {
         if (usdcAmount == 0) revert ZeroAmount();
 
         uint256 gldAmount = previewBuy(usdcAmount);
@@ -296,6 +201,7 @@ contract Exchange is
 
         (uint256 price,) = getPrice();
 
+        // Recalcul local de feeAmount pour le transfert
         uint256 feeAmount = (usdcAmount * feeBps) / BASIS_POINTS;
         uint256 netAmount = usdcAmount - feeAmount;
 
@@ -303,17 +209,17 @@ contract Exchange is
         lastActivityAt[msg.sender] = block.timestamp;
         feesBySlot[msg.sender][_currentSlot()] += feeAmount;
 
-        // Transfert USDC user → Exchange
+        // Transfert USDC user → Exchange (entrée des fonds)
         usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);
 
         // Dépôt USDC net dans Treasury
         usdc.forceApprove(address(treasury), netAmount);
         treasury.deposit(netAmount);
 
-        // Mint GLD (avant transfert fees — pattern CEI)
+        // Mint GLD pour l'utilisateur (AVANT d'envoyer les fees vers l'extérieur, pour éviter les reentrancy)
         gld.mint(msg.sender, gldAmount);
 
-        // Fees en dernier
+        // Fees en dernier (même si feeCollector ré-entre, le mint est déjà fait)
         if (feeAmount > 0 && feeCollector != address(0)) {
             usdc.safeTransfer(feeCollector, feeAmount);
         }
@@ -333,6 +239,8 @@ contract Exchange is
 
         (uint256 price,) = getPrice();
 
+        // Recalcul local — previewSell retourne déjà le net
+        // donc on recalcule le brut pour déduire les frais
         uint256 grossAmount = (gldAmount * price) / 1e5;
         uint256 feeAmount   = (grossAmount * feeBps) / BASIS_POINTS;
         uint256 netAmount   = grossAmount - feeAmount;
@@ -341,13 +249,16 @@ contract Exchange is
         lastActivityAt[msg.sender] = block.timestamp;
         feesBySlot[msg.sender][_currentSlot()] += feeAmount;
 
-        // Burn GLD (pattern CEI — état modifié avant interactions externes)
+        // Burn GLD de l'utilisateur
         gld.burn(msg.sender, gldAmount);
 
+        // Retrait USDC depuis Treasury
+        // Frais vers feeCollector, net vers l'utilisateur
         if (feeAmount > 0 && feeCollector != address(0)) {
             treasury.operatorWithdraw(feeCollector, feeAmount);
         }
 
+        // Net vers l'utilisateur
         treasury.operatorWithdraw(msg.sender, netAmount);
 
         emit TokensSold(msg.sender, gldAmount, usdcAmount, price);
@@ -359,62 +270,58 @@ contract Exchange is
         _pause();
         emit ContractsPaused(msg.sender);
     }
-
     function unpause() external onlyOwner {
         _unpause();
         emit ContractsUnpaused(msg.sender);
     }
 
+    /// @notice Met à jour l'adresse du Treasury
     function setTreasury(address newTreasury) external onlyOwner {
         if (newTreasury == address(0)) revert ZeroAddress();
         treasury = ITreasury(newTreasury);
         usdc = IERC20(ITreasury(newTreasury).usdc());
     }
 
+    /// @notice Met à jour le prix fallback
     function setFallbackPrice(uint256 newPrice) external onlyOwner {
         if (newPrice == 0) revert ZeroAmount();
         emit FallbackPriceUpdated(fallbackPrice, newPrice);
         fallbackPrice = newPrice;
     }
 
-    /// @notice Met à jour l'oracle Chainlink XAU/USD
+    /// @notice Met à jour l'adresse oracle Chainlink
     function setOracle(address newOracle) external onlyOwner {
         emit OracleUpdated(address(priceOracle), newOracle);
         priceOracle = AggregatorV3Interface(newOracle);
     }
 
-    /// @notice Met à jour l'oracle Tellor
-    /// @param newOracle address(0) pour désactiver Tellor
-    function setTellorOracle(address newOracle) external onlyOwner {
-        emit TellorOracleUpdated(address(tellorOracle), newOracle);
-        tellorOracle = ITellorOracle(newOracle);
-    }
-
+    /// @notice Met à jour la durée max de fraîcheur oracle
     function setOracleMaxAge(uint256 newMaxAge) external onlyOwner {
         emit OracleMaxAgeUpdated(oracleMaxAge, newMaxAge);
         oracleMaxAge = newMaxAge;
     }
 
+    /// @notice Met à jour les fees (en basis points)
     function setFeeBps(uint256 newFeeBps) external onlyOwner {
         emit FeeBpsUpdated(feeBps, newFeeBps);
         feeBps = newFeeBps;
     }
 
+    /// @notice Met à jour le collecteur de fees
     function setFeeCollector(address newCollector) external onlyOwner {
         if (newCollector == address(0)) revert ZeroAddress();
         emit FeeCollectorUpdated(feeCollector, newCollector);
         feeCollector = newCollector;
     }
 
-    // ─── Cashback ─────────────────────────────────────────────────────────────
-
     /// @dev Retourne le slot semestriel courant (0 à 7)
     function _currentSlot() internal view returns (uint256) {
         uint256 elapsed = block.timestamp - deployedAt;
         uint256 slot    = elapsed / 180 days;
-        return slot > 7 ? 7 : slot;
+        return slot > 7 ? 7 : slot; // plafonné à 7 (4 ans)
     }
 
+    /// @notice Met à jour le taux de cashback (en basis points, max 200 = 2%)
     function setCashbackBps(uint256 newBps) external onlyOwner {
         require(newBps <= 200, "Max 2%");
         emit CashbackBpsUpdated(cashbackBps, newBps);
@@ -429,11 +336,25 @@ contract Exchange is
         cashbackBps = _cashbackBps;
     }
 
+    // ─── UUPS ────────────────────────────────────────────────────────────────
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    // ─── Cashback ─────────────────────────────────────────────────────────────
+
+    uint256 public deployedAt;                         // timestamp déploiement
+    mapping(address => uint256[8]) public feesBySlot;  // frais par semestre (8 slots = 4 ans)
+    mapping(address => uint256)    public lastActivityAt; // dernière tx buy/sell
+    uint256 public cashbackBps;                        // taux cashback (50 = 0.5%)
+
     /// @notice L'utilisateur réclame son cashback (0.5% des frais des 24 derniers mois)
+    /// @dev Conditions : avoir eu au moins 1 tx dans les 6 derniers mois
     function claimCashback() external nonReentrant whenNotPaused {
+        // Vérifier l'activité semestrielle
         if (block.timestamp - lastActivityAt[msg.sender] > 180 days)
             revert InactiveAccount();
 
+        // Calculer les frais des 4 derniers slots (24 mois glissants)
         uint256 currentSlot = _currentSlot();
         uint256 totalFees   = 0;
 
@@ -441,7 +362,7 @@ contract Exchange is
             if (currentSlot >= i) {
                 uint256 slot = currentSlot - i;
                 totalFees += feesBySlot[msg.sender][slot];
-                feesBySlot[msg.sender][slot] = 0;
+                feesBySlot[msg.sender][slot] = 0; // reset après claim
             }
         }
 
@@ -450,6 +371,7 @@ contract Exchange is
         uint256 cashback = (totalFees * cashbackBps) / BASIS_POINTS;
         if (cashback == 0) revert NoCashbackAvailable();
 
+        // Versement depuis Treasury
         treasury.operatorWithdraw(msg.sender, cashback);
 
         emit CashbackClaimed(msg.sender, cashback);
@@ -473,28 +395,22 @@ contract Exchange is
         cashbackAmount = (totalFees * cashbackBps) / BASIS_POINTS;
     }
 
-    // ─── UUPS ────────────────────────────────────────────────────────────────
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
     // ─── Storage gap ─────────────────────────────────────────────────────────
-    //
-    // Slots utilisés (50 total UUPS standard) :
-    //  1. gld
-    //  2. treasury
-    //  3. usdc
-    //  4. priceOracle
-    //  5. fallbackPrice
-    //  6. oracleMaxAge
-    //  7. feeBps
-    //  8. feeCollector
-    //  9. deployedAt
-    // 10. feesBySlot      (mapping)
-    // 11. lastActivityAt  (mapping)
-    // 12. cashbackBps
-    // 13. tellorOracle    ← nouveau slot V2
-    //
-    // 37 slots restants
 
-    uint256[37] private __gap;
+    /// @dev => 8 slots utilisés, soit 42 restants pour les futures variables
+    /// Slot Variable 
+    /// 1. gld
+    /// 2. treasury
+    /// 3. usdc
+    /// 4. priceOracle
+    /// 5. fallbackPrice
+    /// 6. oracleMaxAge
+    /// 7. feeBps
+    /// 8. feeCollector
+    /// 9. deployedAt
+    /// 10. lastActivityAt
+    /// 11. feesBySlot
+    /// 12. cashbackBps
+
+    uint256[38] private __gap;
 }

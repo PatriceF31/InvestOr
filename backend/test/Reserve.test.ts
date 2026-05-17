@@ -65,7 +65,7 @@ describe("Reserve — Étapes 8 & 14 : Réserve + Proof of Reserve", () => {
     treasury = await ethers.getContractAt("Treasury", await treasuryProxy.getAddress());
 
     // Exchange impl + proxy
-    const ExchangeFactory = await ethers.getContractFactory("Exchange");
+    const ExchangeFactory = await ethers.getContractFactory("contracts/Exchange.sol:Exchange");
     const exchangeImpl = await ExchangeFactory.deploy();
     const exchangeInitData = exchangeImpl.interface.encodeFunctionData("initialize", [
       owner.address,
@@ -75,10 +75,10 @@ describe("Reserve — Étapes 8 & 14 : Réserve + Proof of Reserve", () => {
       PRICE_90,
     ]);
     const exchangeProxy = await ProxyFactory.deploy(await exchangeImpl.getAddress(), exchangeInitData);
-    exchange = await ethers.getContractAt("Exchange", await exchangeProxy.getAddress());
+    exchange = await ethers.getContractAt("contracts/Exchange.sol:Exchange", await exchangeProxy.getAddress());
 
     // Reserve impl + proxy
-    const ReserveFactory = await ethers.getContractFactory("Reserve");
+    const ReserveFactory = await ethers.getContractFactory("contracts/Reserve.sol:Reserve");
     const reserveImpl = await ReserveFactory.deploy();
     const reserveInitData = reserveImpl.interface.encodeFunctionData("initialize", [
       owner.address,
@@ -89,7 +89,7 @@ describe("Reserve — Étapes 8 & 14 : Réserve + Proof of Reserve", () => {
       RATIO_100,
     ]);
     const reserveProxy = await ProxyFactory.deploy(await reserveImpl.getAddress(), reserveInitData);
-    reserve = await ethers.getContractAt("Reserve", await reserveProxy.getAddress());
+    reserve = await ethers.getContractAt("contracts/Reserve.sol:Reserve", await reserveProxy.getAddress());
 
     // Rôles
     await gld.setMinter(await exchangeProxy.getAddress());
@@ -436,7 +436,7 @@ describe("recapitalize", () => {
 
   describe("Upgradeability (UUPS)", () => {
     it("le owner peut upgrader", async () => {
-      const Factory = await ethers.getContractFactory("Reserve");
+      const Factory = await ethers.getContractFactory("contracts/Reserve.sol:Reserve");
       const newImpl = await Factory.deploy();
       await expect(
         reserve.connect(owner).upgradeToAndCall(await newImpl.getAddress(), "0x")
@@ -444,7 +444,7 @@ describe("recapitalize", () => {
     });
 
     it("un non-owner ne peut pas upgrader", async () => {
-      const Factory = await ethers.getContractFactory("Reserve");
+      const Factory = await ethers.getContractFactory("contracts/Reserve.sol:Reserve");
       const newImpl = await Factory.deploy();
       await expect(
         reserve.connect(alice).upgradeToAndCall(await newImpl.getAddress(), "0x")

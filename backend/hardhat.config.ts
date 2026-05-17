@@ -5,29 +5,35 @@ import "dotenv/config";
 export default defineConfig({
   plugins: [hardhatToolboxMochaEthersPlugin],
   solidity: {
-      profiles: {
-        default: {
-          version: "0.8.28",
-          settings: {
-            optimizer: {
-              enabled: true,
-              runs: 200,
-            },
-            viaIR: true,
+    profiles: {
+      default: {
+        version: "0.8.28",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+          viaIR: true,
+          outputSelection: {
+            "*": { "*": ["storageLayout"] },
           },
         },
-        production: {
-          version: "0.8.28",
-          settings: {
-            optimizer: {
-              enabled: true,
-              runs: 200,
-            },
-            viaIR: true,
+      },
+      production: {
+        version: "0.8.28",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+          viaIR: true,
+          outputSelection: {
+            "*": { "*": ["storageLayout"] },
           },
         },
       },
     },
+  },
   networks: {
     hardhatMainnet: {
       type: "edr-simulated",
@@ -44,7 +50,7 @@ export default defineConfig({
       accounts: [
         configVariable("SEPOLIA_PRIVATE_KEY"),
         configVariable("MINTER_PRIVATE_KEY"),
-  ],
+      ],
     },
   },
   verify: {

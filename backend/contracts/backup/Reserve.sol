@@ -20,6 +20,7 @@ interface IGLDReserve {
 /// @dev Interface Treasury
 interface ITreasuryReserve {
     function totalDeposited() external view returns (uint256);
+    //function deposit(uint256 amount) external;
     function usdc() external view returns (address);
     function injectCapital(uint256 amount) external;
 }
@@ -31,15 +32,6 @@ interface IOracle {
     );
 }
 
-/// @dev Interface Oracle Tellor
-/// @notice Même interface que dans Exchange — partagée par cohérence
-interface ITellorOracleReserve {
-    function getDataBefore(bytes32 _queryId, uint256 _timestamp)
-        external
-        view
-        returns (bytes memory _value, uint256 _timestampRetrieved);
-}
-
 /// @dev Interface Exchange
 interface IExchange {
     function pause() external;
@@ -47,7 +39,6 @@ interface IExchange {
     function paused() external view returns (bool);
     function fallbackPrice() external view returns (uint256);
     function setOracle(address newOracle) external;
-    function setTellorOracle(address newOracle) external;
     function setFallbackPrice(uint256 newPrice) external;
     function transferOwnership(address newOwner) external;
     function setTreasury(address newTreasury) external;
@@ -56,50 +47,53 @@ interface IExchange {
     function initCashback(uint256 deployedAt_, uint256 cashbackBps_) external;
 }
 
-/// @dev Interface LingotOr pour le Proof of Reserve en mode grammes
+/// @dev Interface LingotOr pour accéder au total de grammes en coffre (Proof of Reserve) — optionnel, dépend de l'implémentation de LingotOr
 interface ILingotOr {
     function totalGrammesEnCoffre() external view returns (uint256);
 }
 
 /// @title Reserve — Surveillance et Proof of Reserve du protocole InvestOr
 /// @notice Vérifie que le Treasury USDC couvre les GLD en circulation au prix actuel
-/// @dev Prix via oracle multi-sources (Chainlink + Tellor) avec fallback Exchange
+/// @dev Peut pauser Exchange automatiquement si le ratio est insuffisant
 contract Reserve is
     Initializable,
     OwnableUpgradeable,
-    ReentrancyGuard,
+    ReentrancyGuard, 
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
 
     // ─── Constantes ───────────────────────────────────────────────────────────
 
-    uint256 public constant BASIS_POINTS  = 10_000;
+    /// @dev Base des ratios : 10000 = 100%
+    uint256 public constant BASIS_POINTS = 10_000;
+
+    /// @dev Ratio minimum par défaut : 10000 bps = 100%
     uint256 public constant DEFAULT_MIN_RATIO = 10_000;
-
-    /// @dev QueryId Tellor XAU/USD — identique à Exchange pour cohérence
-    bytes32 public constant TELLOR_XAU_USD_QUERY_ID =
-        0x5c13cd9c97dbb98f2429c101a2a8150e6c7a0ddaff6124ee176a3a411067ded0;
-
-    /// @dev Tellor 18 dec → 8 dec (cohérent avec Chainlink)
-    uint256 public constant TELLOR_DECIMALS_FACTOR = 1e10;
 
     // ─── Storage ─────────────────────────────────────────────────────────────
 
-    IGLDReserve      public gld;          // slot 1
-    ITreasuryReserve public treasury;     // slot 2
-    IExchange        public exchange;     // slot 3
-    IOracle          public oracle;       // slot 4 — Chainlink XAU/USD
-    uint256          public minRatioBps;  // slot 5
-    uint256          public oracleMaxAge; // slot 6
-    uint256          public lastCheckAt;  // slot 7
-    bool             public lastCheckHealthy; // slot 8
-    mapping(address => bool) public recapitalizers;    // slot 9
-    address[]        public recapitalizerList;          // slot 10
-    ILingotOr        public lingotOr;    // slot 11 — mode grammes V2
+    IGLDReserve      public gld;
+    ITreasuryReserve public treasury;
+    IExchange        public exchange;
+    IOracle          public oracle;
+    ILingotOr        public lingotOr;  // address(0) = mode V1 (USDC), sinon mode V2 (grammes)
 
-    /// @dev Oracle Tellor XAU/USD — slot 12 (nouveau)
-    ITellorOracleReserve public tellorOracle;
+    /// @dev Ratio minimum de collatéralisation en bps (10000 = 100%, 11000 = 110%)
+    uint256 public minRatioBps;
+
+    /// @dev Durée max de fraîcheur des données oracle (défaut: 1 heure)
+    uint256 public oracleMaxAge;
+
+    /// @dev Timestamp du dernier check
+    uint256 public lastCheckAt;
+
+    /// @dev Résultat du dernier check
+    bool public lastCheckHealthy;
+
+    /// @notice Adresses autorisées à recapitaliser (en plus du owner)
+    mapping(address => bool) public recapitalizers;
+    address[] public recapitalizerList;
 
     // ─── Events ──────────────────────────────────────────────────────────────
 
@@ -123,7 +117,6 @@ contract Reserve is
     event MinRatioUpdated(uint256 oldRatio, uint256 newRatio);
     event OracleMaxAgeUpdated(uint256 oldMaxAge, uint256 newMaxAge);
     event OracleUpdated(address indexed oldOracle, address indexed newOracle);
-    event TellorOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event RecapitalizerAdded(address indexed account);
     event RecapitalizerRemoved(address indexed account);
     event LingotOrUpdated(address indexed oldAddr, address indexed newAddr);
@@ -141,7 +134,13 @@ contract Reserve is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
 
-    /// @notice Initialise le contrat Reserve (inchangé — tellorOracle configuré via setTellorOracle)
+    /// @notice Initialise le contrat Reserve
+    /// @param initialOwner   Propriétaire
+    /// @param gldAddress     Proxy GLD
+    /// @param treasuryAddress Proxy Treasury
+    /// @param exchangeAddress Proxy Exchange
+    /// @param oracleAddress  Oracle Chainlink XAU/USD (address(0) = utilise fallback Exchange)
+    /// @param initMinRatio   Ratio minimum initial en bps (ex: 10000 = 100%)
     function initialize(
         address initialOwner,
         address gldAddress,
@@ -166,76 +165,29 @@ contract Reserve is
             oracle = IOracle(oracleAddress);
         }
 
-        minRatioBps      = initMinRatio;
-        oracleMaxAge     = 3600;
+        minRatioBps  = initMinRatio;
+        oracleMaxAge = 3600;
         lastCheckHealthy = true;
     }
 
     // ─── Prix ────────────────────────────────────────────────────────────────
 
-    /// @notice Tente de lire le prix Chainlink XAU/USD
-    function _getChainlinkPrice() internal view returns (uint256 price, bool valid) {
-        if (address(oracle) == address(0)) return (0, false);
-        try oracle.latestRoundData() returns (
-            uint80, int256 answer, uint256, uint256 updatedAt, uint80
-        ) {
-            if (answer > 0 && block.timestamp - updatedAt <= oracleMaxAge) {
-                return (uint256(answer), true);
-            }
-        } catch {}
-        return (0, false);
-    }
-
-    /// @notice Tente de lire le prix Tellor XAU/USD
-    /// @dev Même logique que Exchange._getTellorPrice() — cohérence des deux contrats
-    function _getTellorPrice() internal view returns (uint256 price, bool valid) {
-        if (address(tellorOracle) == address(0)) return (0, false);
-        try tellorOracle.getDataBefore(TELLOR_XAU_USD_QUERY_ID, block.timestamp) returns (
-            bytes memory value,
-            uint256 timestampRetrieved
-        ) {
-            if (
-                value.length > 0 &&
-                timestampRetrieved > 0 &&
-                block.timestamp - timestampRetrieved <= oracleMaxAge
-            ) {
-                uint256 rawPrice = abi.decode(value, (uint256));
-                uint256 converted = rawPrice / TELLOR_DECIMALS_FACTOR;
-                if (converted > 0) return (converted, true);
-            }
-        } catch {}
-        return (0, false);
-    }
-
-    /// @notice Retourne le prix actif (médiane Chainlink+Tellor > l'un ou l'autre > fallback Exchange)
+    /// @notice Retourne le prix actif (oracle ou fallback Exchange)
     /// @return price Prix en USD/gramme, 8 décimales
     function getPrice() public view returns (uint256 price) {
-        (uint256 chainlinkPrice, bool chainlinkOk) = _getChainlinkPrice();
-        (uint256 tellorPrice,    bool tellorOk)    = _getTellorPrice();
-
-        if (chainlinkOk && tellorOk) {
-            return (chainlinkPrice + tellorPrice) / 2;
+        if (address(oracle) != address(0)) {
+            try oracle.latestRoundData() returns (
+                uint80, int256 answer, uint256, uint256 updatedAt, uint80
+            ) {
+                if (answer > 0 && block.timestamp - updatedAt <= oracleMaxAge) {
+                    return uint256(answer);
+                }
+            } catch {}
         }
-        if (chainlinkOk) return chainlinkPrice;
-        if (tellorOk)    return tellorPrice;
-
-        // Dernier recours : fallback défini dans Exchange
+        // Fallback : prix défini dans Exchange
         uint256 fp = exchange.fallbackPrice();
         if (fp == 0) revert NoPriceAvailable();
         return fp;
-    }
-
-    /// @notice Résumé de l'état des oracles (utile pour monitoring et tests)
-    function getOracleStatus() external view returns (
-        uint256 chainlinkPrice,
-        bool    chainlinkOk,
-        uint256 tellorPrice,
-        bool    tellorOk,
-        uint256 activePrice
-    ) {
-        (chainlinkPrice, chainlinkOk) = _getChainlinkPrice();
-        (tellorPrice,    tellorOk)    = _getTellorPrice();
-        activePrice = getPrice();
     }
 
     // ─── Vues ─────────────────────────────────────────────────────────────────
@@ -243,6 +195,10 @@ contract Reserve is
     /// @notice Calcule le ratio de collatéralisation actuel
     /// @dev V1 : collatéral USDC vs valeur GLD en USDC (oracle requis)
     ///      V2 : grammes en coffre vs GLD en circulation (pas d'oracle)
+    /// @return usdcReserve    USDC dans le Treasury (V1) ou grammes en coffre (V2)
+    /// @return gldSupply      GLD en circulation (unités de base)
+    /// @return goldValueUsdc  Valeur des GLD en USDC (V1) ou GLD supply en mg (V2)
+    /// @return ratioBps       Ratio en basis points (10000 = 100%)
     function checkReserve() public view returns (
         uint256 usdcReserve,
         uint256 gldSupply,
@@ -258,8 +214,10 @@ contract Reserve is
         // ── V2 — collatéral physique (lingots ERC-1155) ──────────────────────
         if (address(lingotOr) != address(0)) {
             uint256 grammesEnCoffre = lingotOr.totalGrammesEnCoffre();
-            usdcReserve   = grammesEnCoffre;
-            goldValueUsdc = gldSupply;
+            // Les deux sont en milligrammes — ratio direct sans oracle
+            // ratioBps = grammesEnCoffre / gldSupply * 10000
+            usdcReserve   = grammesEnCoffre;  // grammes en coffre (mg)
+            goldValueUsdc = gldSupply;         // GLD supply (mg)
             if (gldSupply == 0) return (grammesEnCoffre, 0, 0, type(uint256).max);
             ratioBps = (grammesEnCoffre * BASIS_POINTS) / gldSupply;
             return (usdcReserve, gldSupply, goldValueUsdc, ratioBps);
@@ -270,7 +228,8 @@ contract Reserve is
 
         uint256 price = getPrice();
 
-        // GLD dec=3, USDC dec=6, price dec=8 → goldValueUsdc = gldSupply * price / 1e5
+        // GLD decimals = 3, USDC decimals = 6, price decimals = 8
+        // goldValueUsdc = gldSupply * price / 10^5
         goldValueUsdc = (gldSupply * price) / 1e5;
 
         if (goldValueUsdc == 0) {
@@ -293,23 +252,23 @@ contract Reserve is
         uint256 goldValueUsdc,
         uint256 ratioBps,
         uint256 minRatio,
-        bool    healthy,
-        bool    exchangePaused,
+        bool healthy,
+        bool exchangePaused,
         uint256 price,
         uint256 deficitUsdc
     ) {
         (usdcReserve, gldSupply, goldValueUsdc, ratioBps) = checkReserve();
-        minRatio       = minRatioBps;
-        healthy        = ratioBps >= minRatioBps;
+        minRatio      = minRatioBps;
+        healthy       = ratioBps >= minRatioBps;
         exchangePaused = exchange.paused();
-        price          = getPrice();
-        deficitUsdc    = healthy ? 0 : goldValueUsdc * minRatioBps / BASIS_POINTS - usdcReserve;
+        price         = getPrice();
+        deficitUsdc   = healthy ? 0 : goldValueUsdc * minRatioBps / BASIS_POINTS - usdcReserve;
     }
 
     // ─── Proof of Reserve ─────────────────────────────────────────────────────
 
     /// @notice Vérifie la réserve et pause Exchange si le ratio est insuffisant
-    /// @dev Appelable par n'importe qui — incitation à être appelé régulièrement (Chainlink Automation)
+    /// @dev Appelable par n'importe qui — incitation à être appelé régulièrement
     function proofOfReserve() external {
         (
             uint256 usdcReserve,
@@ -334,13 +293,16 @@ contract Reserve is
 
         if (!healthy) {
             uint256 deficit = goldValueUsdc * minRatioBps / BASIS_POINTS - usdcReserve;
+
             emit ReserveDeficit(block.timestamp, deficit, ratioBps, minRatioBps);
 
+            // Pauser Exchange si pas déjà pausé
             if (!exchange.paused()) {
                 exchange.pause();
                 emit ExchangePausedByReserve(block.timestamp, ratioBps);
             }
         } else {
+            // Réactiver Exchange si c'était Reserve qui l'avait pausé
             if (exchange.paused()) {
                 exchange.unpause();
                 emit ExchangeUnpausedByReserve(block.timestamp, ratioBps);
@@ -354,24 +316,32 @@ contract Reserve is
         if (msg.sender != owner() && !recapitalizers[msg.sender])
             revert OwnableUnauthorizedAccount(msg.sender);
         _;
-    }
+    }  
 
     /// @notice Injecte des USDC dans le Treasury pour restaurer le ratio
+    /// @dev Réservé au owner — l'appelant doit avoir approuvé usdc.approve(reserve, amount)
+    /// @param amount Montant USDC à injecter
     function recapitalize(uint256 amount) external onlyRecapitalizerOrOwner nonReentrant {
         if (amount == 0) revert ZeroAmount();
 
         address usdcAddr = treasury.usdc();
         IERC20 usdc = IERC20(usdcAddr);
 
+        // 1. Entrée des fonds : user → Reserve → Treasury
         usdc.safeTransferFrom(msg.sender, address(this), amount);
 
+        // Transfert direct vers Treasury via injectCapital
         usdc.forceApprove(address(treasury), amount);
         ITreasuryReserve(address(treasury)).injectCapital(amount);
 
+        // 2. Lecture du nouveau ratio (après injection)
         (, , , uint256 newRatio) = checkReserve();
 
+        // 3. Emit avant l'appel externe final
         emit Recapitalized(msg.sender, amount, newRatio);
 
+        // 4. Unpause Exchange en dernier (appel externe)
+        // Si le ratio est restauré, réactiver Exchange
         if (newRatio >= minRatioBps && exchange.paused()) {
             exchange.unpause();
             emit ExchangeUnpausedByReserve(block.timestamp, newRatio);
@@ -380,69 +350,69 @@ contract Reserve is
 
     // ─── Admin ───────────────────────────────────────────────────────────────
 
+    /// @notice Upgrade l'implémentation de l'Exchange
     function upgradeExchange(address newImpl) external onlyOwner {
         UUPSUpgradeable(address(exchange)).upgradeToAndCall(newImpl, "");
     }
 
+    /// @notice Met à jour le ratio minimum de collatéralisation
+    /// @param newRatioBps Nouveau ratio en bps (ex: 11000 = 110%)
     function setMinRatio(uint256 newRatioBps) external onlyOwner {
         if (newRatioBps == 0 || newRatioBps > 20_000) revert InvalidRatio(newRatioBps);
         emit MinRatioUpdated(minRatioBps, newRatioBps);
         minRatioBps = newRatioBps;
     }
 
+    /// @notice Met à jour le Treasury de l'Exchange
     function setExchangeTreasury(address newTreasury) external onlyOwner {
         IExchange(address(exchange)).setTreasury(newTreasury);
     }
 
+    /// @notice Met à jour la durée max de fraîcheur oracle
     function setOracleMaxAge(uint256 newMaxAge) external onlyOwner {
         emit OracleMaxAgeUpdated(oracleMaxAge, newMaxAge);
         oracleMaxAge = newMaxAge;
     }
 
-    /// @notice Met à jour l'oracle Chainlink de Reserve
+    /// @notice Met à jour l'adresse oracle
     function setOracle(address newOracle) external onlyOwner {
         emit OracleUpdated(address(oracle), newOracle);
         oracle = IOracle(newOracle);
     }
 
-    /// @notice Met à jour l'oracle Tellor de Reserve
-    /// @param newOracle address(0) pour désactiver Tellor
-    function setTellorOracle(address newOracle) external onlyOwner {
-        emit TellorOracleUpdated(address(tellorOracle), newOracle);
-        tellorOracle = ITellorOracleReserve(newOracle);
-    }
-
+    /// @notice Transfère l'ownership de l'Exchange vers une nouvelle adresse
+    /// @dev Utile pour migrer vers une nouvelle Reserve
     function setExchangeOwner(address newOwner) external onlyOwner {
         IExchange(address(exchange)).transferOwnership(newOwner);
     }
 
+    /// @notice Met à jour l'adresse de l'Exchange dans le storage
     function setExchange(address newExchange) external onlyOwner {
         if (newExchange == address(0)) revert ZeroAddress();
         exchange = IExchange(newExchange);
     }
 
-    /// @notice Propage le nouvel oracle Chainlink vers Exchange
+    /// @notice Met à jour l'oracle de l'Exchange
     function setExchangeOracle(address newOracle) external onlyOwner {
         IExchange(address(exchange)).setOracle(newOracle);
     }
 
-    /// @notice Propage le nouvel oracle Tellor vers Exchange
-    function setExchangeTellorOracle(address newOracle) external onlyOwner {
-        IExchange(address(exchange)).setTellorOracle(newOracle);
-    }
-
+    /// @notice Met à jour le prix fallback de l'Exchange
     function setExchangeFallbackPrice(uint256 newPrice) external onlyOwner {
         IExchange(address(exchange)).setFallbackPrice(newPrice);
     }
 
+    /// @notice Met à jour les frais de l'Exchange (en basis points)
     function setExchangeFeeBps(uint256 newFeeBps) external onlyOwner {
         IExchange(address(exchange)).setFeeBps(newFeeBps);
     }
 
+    /// @notice Met à jour le collecteur de frais de l'Exchange
     function setExchangeFeeCollector(address newCollector) external onlyOwner {
         IExchange(address(exchange)).setFeeCollector(newCollector);
     }
 
+    /// @notice Ajoute un recapitalisateur autorisé
     function addRecapitalizer(address account) external onlyOwner {
         if (account == address(0)) revert ZeroAddress();
         if (!recapitalizers[account]) {
@@ -452,10 +422,12 @@ contract Reserve is
         }
     }
 
+    /// @notice Retire un recapitalisateur
     function removeRecapitalizer(address account) external onlyOwner {
         if (recapitalizers[account]) {
             recapitalizers[account] = false;
             emit RecapitalizerRemoved(account);
+            // Retirer de la liste
             for (uint256 i = 0; i < recapitalizerList.length; i++) {
                 if (recapitalizerList[i] == account) {
                     recapitalizerList[i] = recapitalizerList[recapitalizerList.length - 1];
@@ -466,15 +438,18 @@ contract Reserve is
         }
     }
 
+    /// @notice Retourne la liste des recapitalisateurs autorisés
     function getRecapitalizers() external view returns (address[] memory) {
         return recapitalizerList;
     }
 
+    /// @notice Met à jour l'adresse de LingotOr (pour supporter le mode grammes)
     function setLingotOr(address newAddr) external onlyOwner {
         emit LingotOrUpdated(address(lingotOr), newAddr);
         lingotOr = ILingotOr(newAddr);
     }
 
+    /// @notice Initialise les variables cashback d'Exchange (une seule fois après upgrade)
     function initExchangeCashback(uint256 deployedAt_, uint256 cashbackBps_) external onlyOwner {
         IExchange(address(exchange)).initCashback(deployedAt_, cashbackBps_);
     }
@@ -484,22 +459,19 @@ contract Reserve is
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     // ─── Storage gap ─────────────────────────────────────────────────────────
-    //
-    // Slots utilisés (50 total UUPS standard) :
-    //  1. gld
-    //  2. treasury
-    //  3. exchange
-    //  4. oracle             (Chainlink)
-    //  5. minRatioBps
-    //  6. oracleMaxAge
-    //  7. lastCheckAt
-    //  8. lastCheckHealthy
-    //  9. recapitalizers     (mapping)
-    // 10. recapitalizerList  (array)
-    // 11. lingotOr
-    // 12. tellorOracle       ← nouveau slot V2
-    //
-    // 38 slots restants
 
-    uint256[38] private __gap;
+    /// @dev => 10 slots utilisés, soit 40 restants pour les futures variables
+    /// Slot Variable 
+    /// 1. gld (IGLDReserve) 
+    /// 2. treasury (ITreasuryReserve) 
+    /// 3. exchange (IExchange) 
+    /// 4. oracle (IOracle)
+    /// 5. minRatioBps (uint256)
+    /// 6. oracleMaxAge (uint256)
+    /// 7. lastCheckAt (uint256)
+    /// 8. lastCheckHealthy (bool)
+    /// 9. recapitalizers (mapping)
+    /// 10. recapitalizerList (address[])
+    /// 11. lingotOr (ILingotOr) — ajouté dans la V2 pour supporter le mode grammes
+    uint256[39] private __gap;
 }
