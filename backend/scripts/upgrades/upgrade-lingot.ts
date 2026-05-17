@@ -1,10 +1,10 @@
 /**
  * @file upgrades/upgrade-lingot.ts
- * @description Upgrade du contrat LingotOr
+ * @description Upgrade du contrat LingotOr + vérification Etherscan automatique
  * ⚠️  LingotOr est owné par le Safe — le script déploie l'impl et affiche les instructions Safe
  * Usage : npx hardhat run scripts/upgrades/upgrade-lingot.ts --network sepolia
  */
-import { network } from "hardhat";
+import { network, run } from "hardhat";
 
 const PROXY = "0x69159BBd5EaFf05C381497890F02d78F1b595A83";
 const UUPS_ABI = [
@@ -28,6 +28,21 @@ async function main() {
   await impl.waitForDeployment();
   const implAddr = await impl.getAddress();
   console.log(`✅  ${implAddr}`);
+
+  process.stdout.write("  Vérification Etherscan... ");
+  try {
+    await run("verify:verify", {
+      address: implAddr,
+      constructorArguments: [],
+    });
+    console.log("✅");
+  } catch (e: any) {
+    if (e.message?.includes("Already Verified") || e.message?.includes("already verified")) {
+      console.log("✅  (déjà vérifié)");
+    } else {
+      console.log(`⚠️  ${e.message}`);
+    }
+  }
 
   const proxy = new ethers.Contract(PROXY, UUPS_ABI, deployer);
   const owner = await proxy.owner();

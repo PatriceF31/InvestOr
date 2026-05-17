@@ -1,10 +1,10 @@
 /**
  * @file upgrades/upgrade-reserve.ts
- * @description Upgrade du contrat Reserve
+ * @description Upgrade du contrat Reserve + vérification Etherscan automatique
  * ⚠️  Reserve est owné par le Safe — le script déploie l'impl et affiche les instructions Safe
  * Usage : npx hardhat run scripts/upgrades/upgrade-reserve.ts --network sepolia
  */
-import { network } from "hardhat";
+import { network, run } from "hardhat";
 
 const PROXY = "0x130A6A02eee28C4f9A5b01B854ce4aE7BE7D65Ce";
 const UUPS_ABI = [
@@ -23,11 +23,28 @@ async function main() {
   console.log("═══════════════════════════════════════════════════════\n");
 
   process.stdout.write("  Déploiement nouvelle impl... ");
-  const factory = await ethers.getContractFactory("Reserve", deployer);
+  // Nom qualifié — contracts/backup/Reserve.sol existe aussi dans le projet
+  const factory = await ethers.getContractFactory("contracts/Reserve.sol:Reserve", deployer);
   const impl = await factory.deploy();
   await impl.waitForDeployment();
   const implAddr = await impl.getAddress();
   console.log(`✅  ${implAddr}`);
+
+  process.stdout.write("  Vérification Etherscan... ");
+  try {
+    await run("verify:verify", {
+      address: implAddr,
+      constructorArguments: [],
+      contract: "contracts/Reserve.sol:Reserve",
+    });
+    console.log("✅");
+  } catch (e: any) {
+    if (e.message?.includes("Already Verified") || e.message?.includes("already verified")) {
+      console.log("✅  (déjà vérifié)");
+    } else {
+      console.log(`⚠️  ${e.message}`);
+    }
+  }
 
   const proxy = new ethers.Contract(PROXY, UUPS_ABI, deployer);
   const owner = await proxy.owner();

@@ -1,9 +1,9 @@
 /**
  * @file upgrades/upgrade-gld.ts
- * @description Upgrade du contrat GLD
+ * @description Upgrade du contrat GLD + vérification Etherscan automatique
  * Usage : npx hardhat run scripts/upgrades/upgrade-gld.ts --network sepolia
  */
-import { network } from "hardhat";
+import { network, run } from "hardhat";
 
 const PROXY = "0xA4ddCDf84F0C0acC8cA22E77f501d308C4E87dD4";
 const UUPS_ABI = [
@@ -27,6 +27,21 @@ async function main() {
   await impl.waitForDeployment();
   const implAddr = await impl.getAddress();
   console.log(`✅  ${implAddr}`);
+
+  process.stdout.write("  Vérification Etherscan... ");
+  try {
+    await run("verify:verify", {
+      address: implAddr,
+      constructorArguments: [],
+    });
+    console.log("✅");
+  } catch (e: any) {
+    if (e.message?.includes("Already Verified") || e.message?.includes("already verified")) {
+      console.log("✅  (déjà vérifié)");
+    } else {
+      console.log(`⚠️  ${e.message}`);
+    }
+  }
 
   process.stdout.write("  upgradeToAndCall... ");
   const proxy = new ethers.Contract(PROXY, UUPS_ABI, deployer);

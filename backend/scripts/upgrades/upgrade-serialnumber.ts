@@ -1,9 +1,9 @@
 /**
  * @file upgrades/upgrade-serialnumber.ts
- * @description Upgrade du contrat SerialNumber
+ * @description Upgrade du contrat SerialNumber + vérification Etherscan automatique
  * Usage : npx hardhat run scripts/upgrades/upgrade-serialnumber.ts --network sepolia
  */
-import { network } from "hardhat";
+import { network, run } from "hardhat";
 
 const PROXY = "0x24622EfA10CfBA2B6F0e2845a89B09711293867d";
 const UUPS_ABI = [
@@ -27,6 +27,21 @@ async function main() {
   await impl.waitForDeployment();
   const implAddr = await impl.getAddress();
   console.log(`✅  ${implAddr}`);
+
+  process.stdout.write("  Vérification Etherscan... ");
+  try {
+    await run("verify:verify", {
+      address: implAddr,
+      constructorArguments: [],
+    });
+    console.log("✅");
+  } catch (e: any) {
+    if (e.message?.includes("Already Verified") || e.message?.includes("already verified")) {
+      console.log("✅  (déjà vérifié)");
+    } else {
+      console.log(`⚠️  ${e.message}`);
+    }
+  }
 
   const proxy = new ethers.Contract(PROXY, UUPS_ABI, deployer);
   const owner = await proxy.owner();
