@@ -3,7 +3,8 @@
  * @description Upgrade du contrat Treasury + vérification Etherscan automatique
  * Usage : npx hardhat run scripts/upgrades/upgrade-treasury.ts --network sepolia
  */
-import { network, run } from "hardhat";
+import hre, { network } from "hardhat";
+
 
 const PROXY = "0xcCb3508f3Dc41e0AeE7FFedB0f410aB555Ff40af";
 const UUPS_ABI = [
@@ -28,20 +29,7 @@ async function main() {
   const implAddr = await impl.getAddress();
   console.log(`✅  ${implAddr}`);
 
-  process.stdout.write("  Vérification Etherscan... ");
-  try {
-    await run("verify:verify", {
-      address: implAddr,
-      constructorArguments: [],
-    });
-    console.log("✅");
-  } catch (e: any) {
-    if (e.message?.includes("Already Verified") || e.message?.includes("already verified")) {
-      console.log("✅  (déjà vérifié)");
-    } else {
-      console.log(`⚠️  ${e.message}`);
-    }
-  }
+  console.log(`  ℹ️  Vérifier : npx hardhat verify --network sepolia --build-profile default --contract contracts/Treasury.sol:Treasury ${implAddr}`);
 
   process.stdout.write("  upgradeToAndCall... ");
   const proxy = new ethers.Contract(PROXY, UUPS_ABI, deployer);

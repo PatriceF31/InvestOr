@@ -3,7 +3,8 @@
  * @description Upgrade EventLogger + SerialNumber + vérification Etherscan automatique
  * Usage : npx hardhat run scripts/upgrades/upgrade-logger-serial.ts --network sepolia
  */
-import { network, run } from "hardhat";
+import hre, { network } from "hardhat";
+
 
 const PROXIES: Record<string, string> = {
   EventLogger:  "0x70eFf6af5aCE213cEe7a3AFC4587db478c4F4b5a",
@@ -49,20 +50,7 @@ async function main() {
       return implAddr;
     });
 
-    await step("Vérification Etherscan", async () => {
-      try {
-        await run("verify:verify", {
-          address: implAddr!,
-          constructorArguments: [],
-        });
-        return "OK";
-      } catch (e: any) {
-        if (e.message?.includes("Already Verified") || e.message?.includes("already verified")) {
-          return "déjà vérifié";
-        }
-        return `⚠️  ${e.message}`;
-      }
-    });
+    console.log(`  ℹ️  Vérifier : npx hardhat verify --network sepolia --build-profile default --contract contracts/${name}.sol:${name} ${implAddr}`);
 
     await step("upgradeToAndCall", async () => {
       const proxy = new ethers.Contract(proxyAddr, UUPS_ABI, deployer);

@@ -21,6 +21,7 @@ import path from "path";
 const CONTRACTS: { source: string; name: string }[] = [
   { source: "contracts/Exchange.sol", name: "Exchange" },
   { source: "contracts/Reserve.sol",  name: "Reserve"  },
+  { source: "contracts/Treasury.sol", name: "Treasury" },
 ];
 
 const DEBUG = process.argv.includes("--debug");

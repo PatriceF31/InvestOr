@@ -9,7 +9,8 @@
  * Toujours ajouter les nouvelles variables APRÈS les existantes.
  */
 
-import { network, run } from "hardhat";
+import hre, { network } from "hardhat";
+
 
 // ─── Adresses des proxies (NE PAS MODIFIER — adresses permanentes) ────────────
 const PROXIES = {
@@ -84,22 +85,9 @@ async function deployAndVerify(contractKey: keyof typeof PROXIES): Promise<strin
     return implAddr;
   });
 
-  await step("Vérification Etherscan", async () => {
-    try {
-      await run("verify:verify", {
-        address: implAddr!,
-        constructorArguments: [],
-        // contract uniquement si nom qualifié nécessaire
-        ...(contractName.includes(":") ? { contract: contractName } : {}),
-      });
-      return "OK";
-    } catch (e: any) {
-      if (e.message?.includes("Already Verified") || e.message?.includes("already verified")) {
-        return "déjà vérifié";
-      }
-      return `⚠️  ${e.message}`;
-    }
-  });
+  // Afficher la commande CLI pour vérifier après déploiement
+  const contractFlag = contractName.includes(":") ? ` --contract ${contractName}` : "";
+  console.log(`  ℹ️  Vérifier : npx hardhat verify --network sepolia --build-profile default${contractFlag} \${implAddr}`);
 
   return implAddr!;
 }
