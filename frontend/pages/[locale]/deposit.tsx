@@ -68,11 +68,9 @@ function DepositPanel() {
     query: { enabled: !!address && !!usdcAddress },
   });
 
-  // Balance USDC dans Treasury
+  // Total USDC déposé dans Treasury (agrégé V2)
   const { data: treasuryBalance } = useReadContract({
-    ...treasury, functionName: "balanceOf",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
+    ...treasury, functionName: "totalDeposited",
   });
 
   const walletStr   = walletBalance   !== undefined ? formatUnits(walletBalance   as bigint, 6) : "—";
@@ -96,7 +94,7 @@ function DepositPanel() {
 
       // 2. Recapitalize via Reserve
       const tx = await writeContractAsync({
-        ...reserve, functionName: "recapitalize", args: [parsed],
+        ...reserve, functionName: "recapitalize", args: [parsed, usdcAddress as `0x${string}`],
       });
       setTxHash(tx);
       setAmount("");
@@ -166,9 +164,7 @@ function WithdrawPanel() {
     useWaitForTransactionReceipt({ hash: txHash });
 
   const { data: treasuryBalance } = useReadContract({
-    ...treasury, functionName: "balanceOf",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
+    ...treasury, functionName: "totalDeposited",
   });
 
   const treasuryStr = treasuryBalance !== undefined
@@ -179,7 +175,7 @@ function WithdrawPanel() {
     const parsed = parseUnits(amount, 6);
     try {
       const tx = await writeContractAsync({
-        ...treasury, functionName: "operatorWithdraw", args: [address, parsed],
+        ...treasury, functionName: "operatorWithdraw", args: [address, parsed, "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as `0x${string}`],
       });
       setTxHash(tx);
       setAmount("");
@@ -248,7 +244,7 @@ export default function DepositPage() {
           Total en réserve :{" "}
           <span className="font-semibold text-foreground">
             {totalDeposited !== undefined
-              ? `${formatUnits(totalDeposited as bigint, 6)} USDC`
+              ? `${formatUnits(totalDeposited as bigint, 6)} USDC + EURC`
               : "—"
             }
           </span>

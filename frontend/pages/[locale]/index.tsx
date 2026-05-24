@@ -51,7 +51,7 @@ export default function DashboardPage() {
   const t = useTranslations("dashboard");
   const { address, isConnected } = useAccount();
   const [mounted, setMounted] = useState(false);
-  const { formatted, reserve, isOracle, isLoading, refetch } = useDashboard();
+  const { formatted, reserve, isOracle, priceSource, isLoading, refetch } = useDashboard();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -98,14 +98,16 @@ export default function DashboardPage() {
           icon={Wallet}
           label={t("balance_usdc")}
           value={`${formatted.usdcBalance} USDC`}
-          sub={t("in_your_wallet")}
+          sub={formatted.eurcBalance !== "—" && formatted.eurcBalance !== "0.0"
+            ? `+ ${formatted.eurcBalance} EURC`
+            : t("in_your_wallet")}
         />
         <StatCard
           icon={TrendingUp}
           label={t("gold_price")}
           value={formatted.pricePerGram}
           sub={formatted.pricePerOz + " / once"}
-          badge={isOracle ? "Chainlink" : "Fallback"}
+          badge={isOracle ? (priceSource ?? "Oracle") : "Fallback"}
           badgeVariant={isOracle ? "default" : "secondary"}
         />
         <StatCard

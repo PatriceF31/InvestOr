@@ -15,6 +15,44 @@ import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
 import { wagmiConfig } from "@/lib/wagmi.config";
 
+// ── Adresses stablecoins Sepolia ──────────────────────────────────────────────
+const USDC_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as const;
+const EURC_ADDRESS = "0x08210F9170F89Ab7658F0B5E3fF39b0E03C594D4" as const;
+type StableToken = "USDC" | "EURC";
+const TOKEN_ADDRESS: Record<StableToken, `0x${string}`> = {
+  USDC: USDC_ADDRESS,
+  EURC: EURC_ADDRESS,
+};
+
+const ERC20_ABI = [
+  { name: "balanceOf", type: "function", stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }], outputs: [{ type: "uint256" }] },
+  { name: "approve", type: "function", stateMutability: "nonpayable",
+    inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }],
+    outputs: [{ type: "bool" }] },
+] as const;
+
+// ── Sélecteur de token ────────────────────────────────────────────────────────
+function TokenSelector({ value, onChange }: {
+  value: StableToken;
+  onChange: (t: StableToken) => void;
+}) {
+  return (
+    <div className="flex rounded-lg border border-border overflow-hidden">
+      {(["USDC", "EURC"] as StableToken[]).map((t) => (
+        <button key={t} onClick={() => onChange(t)}
+          className={`flex-1 py-2 text-sm font-medium transition-colors ${
+            value === t
+              ? "bg-primary text-primary-foreground"
+              : "bg-background text-muted-foreground hover:bg-muted"
+          }`}>
+          {t}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Composant ligne de détail ─────────────────────────────────────────────────
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -30,7 +68,6 @@ type TxState = "idle" | "pending" | "confirming" | "success" | "error";
 
 function TxStatus({ state, hash }: { state: TxState; hash?: `0x${string}` }) {
   if (state === "idle") return null;
-
   return (
     <div className={`rounded-lg p-4 flex items-start gap-3 text-sm ${
       state === "success" ? "bg-green-500/10 border border-green-500/20" :
@@ -62,90 +99,86 @@ function TxStatus({ state, hash }: { state: TxState; hash?: `0x${string}` }) {
 function BuyPanel() {
   const t = useTranslations("trade");
   const { address } = useAccount();
-  const { exchange, treasury } = useContracts();
-  const [usdcInput, setUsdcInput] = useState("");
+  const { exchange } = useContracts();
+  const [stableInput, setStableInput] = useState("");
+  const [selectedToken, setSelectedToken] = useState<StableToken>("USDC");
   const [step, setStep] = useState<"idle" | "approving" | "buying">("idle");
+  const [txHash, setTxHash]   = useState<`0x${string}` | undefined>();
+  const [txState, setTxState] = useState<TxState>("idle");
 
   const { writeContractAsync } = useWriteContract();
-  const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
-  const [txState, setTxState] = useState<TxState>("idle");
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({ hash: txHash });
-  const { data: feeBps } = useReadContract({
-    ...exchange,
-    functionName: "feeBps",
-  });
+  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash: txHash });
+
+  const tokenAddress = TOKEN_ADDRESS[selectedToken];
+
+  const { data: feeBps } = useReadContract({ ...exchange, functionName: "feeBps" });
   const feePercent = feeBps !== undefined ? (Number(feeBps) / 100).toFixed(2) + "%" : "0%";
 
-  // Prix actuel
-  const { data: priceRaw } = useReadContract({
-    ...exchange,
-    functionName: "getPrice",
-  });
-  const priceData = priceRaw as [bigint, boolean] | undefined;
-  const price    = priceData?.[0];
-  const isOracle = priceData?.[1] ?? false;
+  // Prix — getPrice() retourne (uint256, uint8)
+  const { data: priceRaw } = useReadContract({ ...exchange, functionName: "getPrice" });
+  const priceData   = priceRaw as [bigint, number] | undefined;
+  const price       = priceData?.[0];
+  const priceSource = priceData?.[1] ?? 3;
+  const isOracle    = priceSource <= 2;
 
-  // Preview
-  const usdcParsed = usdcInput && Number(usdcInput) > 0
-    ? parseUnits(usdcInput, 6) : undefined;
+  const stableParsed = stableInput && Number(stableInput) > 0
+    ? parseUnits(stableInput, 6) : undefined;
 
+  // previewBuy(amount, token)
   const { data: gldPreview } = useReadContract({
     ...exchange,
     functionName: "previewBuy",
-    args: usdcParsed ? [usdcParsed] : undefined,
-    query: { enabled: !!usdcParsed },
+    args: stableParsed ? [stableParsed, tokenAddress] : undefined,
+    query: { enabled: !!stableParsed },
   });
 
-  // Adresse USDC
-  const { data: usdcAddress } = useReadContract({
-    ...treasury,
-    functionName: "usdc",
-  });
-
-  // Balance USDC utilisateur
-  const { data: usdcBalance } = useReadContract({
-    address: usdcAddress as `0x${string}` | undefined,
-    abi: [{ name: "balanceOf", type: "function", stateMutability: "view",
-      inputs: [{ name: "account", type: "address" }],
-      outputs: [{ type: "uint256" }] }] as const,
+  // Balance du token sélectionné
+  const { data: tokenBalance } = useReadContract({
+    address: tokenAddress,
+    abi: ERC20_ABI,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    query: { enabled: !!address && !!usdcAddress },
+    query: { enabled: !!address },
   });
 
-  const gldAmount = gldPreview !== undefined
-    ? formatUnits(gldPreview as bigint, 3) : "—";
-  const priceStr  = price !== undefined
-    ? `$${(Number(price) / 1e8).toFixed(2)}` : "—";
-  const balanceStr = usdcBalance !== undefined
-    ? formatUnits(usdcBalance as bigint, 6) : "—";
+  const gldAmount  = gldPreview !== undefined ? formatUnits(gldPreview as bigint, 3) : "—";
+  const priceStr   = price !== undefined ? `$${(Number(price) / 1e8).toFixed(2)}` : "—";
+  const balanceStr = tokenBalance !== undefined ? formatUnits(tokenBalance as bigint, 6) : "—";
+
+  // Reset input quand on change de token
+  const handleTokenChange = (t: StableToken) => {
+    setSelectedToken(t);
+    setStableInput("");
+  };
 
   const handleBuy = async () => {
-    if (!usdcParsed || !usdcAddress || !address) return;
+    if (!stableParsed || !address) return;
     try {
       setTxState("pending");
       setStep("approving");
+
+      // Approve
       const approveTx = await writeContractAsync({
-        address: usdcAddress as `0x${string}`,
-        abi: [{ name: "approve", type: "function", stateMutability: "nonpayable",
-          inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }],
-          outputs: [{ type: "bool" }] }] as const,
+        address: tokenAddress,
+        abi: ERC20_ABI,
         functionName: "approve",
-        args: [exchange.address, usdcParsed],
+        args: [exchange.address, stableParsed],
       });
       await waitForTransactionReceipt(wagmiConfig, { hash: approveTx });
+
       setStep("buying");
       setTxState("confirming");
+
+      // buy(stableAmount, token)
       const buyTx = await writeContractAsync({
         ...exchange,
         functionName: "buy",
-        args: [usdcParsed],
+        args: [stableParsed, tokenAddress],
       });
       setTxHash(buyTx);
       setTxState("success");
       setStep("idle");
-      setUsdcInput("");
+      setStableInput("");
     } catch {
       setTxState("error");
       setStep("idle");
@@ -156,33 +189,30 @@ function BuyPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Input USDC */}
+      {/* Sélecteur USDC / EURC */}
+      <div className="space-y-2">
+        <Label>Stablecoin</Label>
+        <TokenSelector value={selectedToken} onChange={handleTokenChange} />
+      </div>
+
+      {/* Input stablecoin */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label>{t("amount_usdc")}</Label>
+          <Label>{t("amount_usdc").replace("USDC", selectedToken)}</Label>
           <span className="text-xs text-muted-foreground">
-            {t("balance")} : {balanceStr} USDC
+            Solde : {balanceStr} {selectedToken}
           </span>
         </div>
         <div className="relative">
-          <Input
-            type="number"
-            placeholder="0.00"
-            value={usdcInput}
-            onChange={(e) => setUsdcInput(e.target.value)}
-            className="pr-16 text-lg"
-            min="0"
-          />
+          <Input type="number" placeholder="0.00" value={stableInput}
+            onChange={(e) => setStableInput(e.target.value)}
+            className="pr-20 text-lg" min="0" />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
-            USDC
+            {selectedToken}
           </span>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-xs text-primary p-0 h-auto"
-          onClick={() => setUsdcInput(balanceStr !== "—" ? balanceStr : "")}
-        >
+        <Button variant="ghost" size="sm" className="text-xs text-primary p-0 h-auto"
+          onClick={() => setStableInput(balanceStr !== "—" ? balanceStr : "")}>
           Max
         </Button>
       </div>
@@ -198,9 +228,7 @@ function BuyPanel() {
       <div className="space-y-2">
         <Label>{t("you_receive")}</Label>
         <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-center justify-between">
-          <span className="text-2xl font-bold text-primary">
-            {gldAmount}
-          </span>
+          <span className="text-2xl font-bold text-primary">{gldAmount}</span>
           <span className="text-sm font-medium text-muted-foreground">GLD</span>
         </div>
         {gldAmount !== "—" && (
@@ -215,33 +243,26 @@ function BuyPanel() {
       {/* Détails */}
       <div className="space-y-2">
         <DetailRow label={t("price_per_gram")} value={priceStr} />
-        <DetailRow label={t("price_source")} value={isOracle ? t("oracle_price") : t("fallback_price")} />
-        <DetailRow label={t("fee")} value={feePercent} />
+        <DetailRow label={t("price_source")}
+          value={isOracle
+            ? (priceSource === 0 ? "Chainlink + Tellor" : priceSource === 1 ? "Chainlink" : "Tellor")
+            : t("fallback_price")} />
+        <DetailRow label={t("fees")} value={feePercent} />
         <DetailRow label={t("step1")} value={step === "approving" ? t("step1_pending") : t("step1")} />
-        <DetailRow label={t("step2")} value={step === "buying" ? t("step2_pending") : t("step2")} />
+        <DetailRow label={t("step2")} value={step === "buying"   ? t("step2_pending") : t("step2")} />
       </div>
 
-      {/* Statut tx */}
       <TxStatus state={txState} hash={txHash} />
 
-      {/* Bouton */}
-      <Button
-        className="w-full"
-        size="lg"
-        disabled={!usdcInput || Number(usdcInput) <= 0 || isLoading || !address}
-        onClick={handleBuy}
-      >
+      <Button className="w-full" size="lg"
+        disabled={!stableInput || Number(stableInput) <= 0 || isLoading || !address}
+        onClick={handleBuy}>
         {isLoading
-          ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> En cours...</>
-          : t("buy") + " GLD"
+          ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />En cours...</>
+          : `${t("buy")} GLD avec ${selectedToken}`
         }
       </Button>
-
-      {!address && (
-        <p className="text-center text-sm text-muted-foreground">
-          {t("connect_to_buy")}
-        </p>
-      )}
+      {!address && <p className="text-center text-sm text-muted-foreground">{t("connect_to_buy")}</p>}
     </div>
   );
 }
@@ -250,65 +271,60 @@ function BuyPanel() {
 function SellPanel() {
   const t = useTranslations("trade");
   const { address } = useAccount();
-  const { gld, exchange } = useContracts();
-  const [gldInput, setGldInput] = useState("");
+  const { exchange, gld } = useContracts();
+  const [gldInput, setGldInput]       = useState("");
+  const [selectedToken, setSelectedToken] = useState<StableToken>("USDC");
+  const [txHash, setTxHash]   = useState<`0x${string}` | undefined>();
+  const [txState, setTxState] = useState<TxState>("idle");
 
   const { writeContractAsync } = useWriteContract();
-  const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
-  const [txState, setTxState] = useState<TxState>("idle");
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({ hash: txHash });
-  const { data: feeBps } = useReadContract({
-    ...exchange,
-    functionName: "feeBps",
-  });
+  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash: txHash });
+
+  const tokenAddress = TOKEN_ADDRESS[selectedToken];
+
+  const { data: feeBps } = useReadContract({ ...exchange, functionName: "feeBps" });
   const feePercent = feeBps !== undefined ? (Number(feeBps) / 100).toFixed(2) + "%" : "0%";
 
-  // Prix actuel
-  const { data: priceRaw } = useReadContract({
-    ...exchange,
-    functionName: "getPrice",
-  });
-  const priceData = priceRaw as [bigint, boolean] | undefined;
-  const price    = priceData?.[0];
-  const isOracle = priceData?.[1] ?? false;
+  // Prix — getPrice() retourne (uint256, uint8)
+  const { data: priceRaw } = useReadContract({ ...exchange, functionName: "getPrice" });
+  const priceData   = priceRaw as [bigint, number] | undefined;
+  const price       = priceData?.[0];
+  const priceSource = priceData?.[1] ?? 3;
+  const isOracle    = priceSource <= 2;
 
-  // Balance GLD utilisateur
+  const gldParsed = gldInput && Number(gldInput) > 0
+    ? parseUnits(gldInput, 3) : undefined;
+
+  // previewSell(gldAmount, token)
+  const { data: stablePreview } = useReadContract({
+    ...exchange,
+    functionName: "previewSell",
+    args: gldParsed ? [gldParsed, tokenAddress] : undefined,
+    query: { enabled: !!gldParsed },
+  });
+
+  // Balance GLD
   const { data: gldBalance } = useReadContract({
-    ...gld,
-    functionName: "balanceOf",
+    ...gld, functionName: "balanceOf",
     args: address ? [address] : undefined,
     query: { enabled: !!address },
   });
 
-  // Preview
-  const gldParsed = gldInput && Number(gldInput) > 0
-    ? parseUnits(gldInput, 3) : undefined;
-
-  const { data: usdcPreview } = useReadContract({
-    ...exchange,
-    functionName: "previewSell",
-    args: gldParsed ? [gldParsed] : undefined,
-    query: { enabled: !!gldParsed },
-  });
-
-  const usdcAmount  = usdcPreview !== undefined
-    ? formatUnits(usdcPreview as bigint, 6) : "—";
-  const balanceStr  = gldBalance !== undefined
-    ? formatUnits(gldBalance as bigint, 3) : "—";
-  const priceStr    = price !== undefined
-    ? `$${(Number(price) / 1e8).toFixed(2)}` : "—";
+  const stableAmount = stablePreview !== undefined
+    ? formatUnits(stablePreview as bigint, 6) : "—";
+  const priceStr   = price !== undefined ? `$${(Number(price) / 1e8).toFixed(2)}` : "—";
+  const balanceStr = gldBalance !== undefined ? formatUnits(gldBalance as bigint, 3) : "—";
 
   const handleSell = async () => {
     if (!gldParsed || !address) return;
     try {
       setTxState("pending");
+      // sell(gldAmount, token) — pas d'approve GLD nécessaire (burn direct)
       const sellTx = await writeContractAsync({
         ...exchange,
         functionName: "sell",
-        args: [gldParsed],
+        args: [gldParsed, tokenAddress],
       });
-      setTxState("confirming");
       setTxHash(sellTx);
       setTxState("success");
       setGldInput("");
@@ -321,36 +337,26 @@ function SellPanel() {
 
   return (
     <div className="space-y-6">
+      {/* Sélecteur token de sortie */}
+      <div className="space-y-2">
+        <Label>Recevoir en</Label>
+        <TokenSelector value={selectedToken} onChange={setSelectedToken} />
+      </div>
+
       {/* Input GLD */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label>{t("amount_gld")}</Label>
-          <span className="text-xs text-muted-foreground">
-            {t("balance")} : {balanceStr} GLD
-          </span>
+          <span className="text-xs text-muted-foreground">Solde : {balanceStr} GLD</span>
         </div>
         <div className="relative">
-          <Input
-            type="number"
-            placeholder="0.000"
-            value={gldInput}
+          <Input type="number" placeholder="0.000" value={gldInput}
             onChange={(e) => setGldInput(e.target.value)}
-            className="pr-16 text-lg"
-            min="0"
-            step="0.001"
-          />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
-            GLD
-          </span>
+            className="pr-16 text-lg" min="0" step="0.001" />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">GLD</span>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-xs text-primary p-0 h-auto"
-          onClick={() => setGldInput(balanceStr !== "—" ? balanceStr : "")}
-        >
-          Max
-        </Button>
+        <Button variant="ghost" size="sm" className="text-xs text-primary p-0 h-auto"
+          onClick={() => setGldInput(balanceStr !== "—" ? balanceStr : "")}>Max</Button>
       </div>
 
       {/* Flèche */}
@@ -360,57 +366,47 @@ function SellPanel() {
         </div>
       </div>
 
-      {/* Output USDC */}
+      {/* Output stablecoin */}
       <div className="space-y-2">
         <Label>{t("you_receive")}</Label>
         <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-center justify-between">
-          <span className="text-2xl font-bold text-primary">
-            {usdcAmount}
-          </span>
-          <span className="text-sm font-medium text-muted-foreground">USDC</span>
+          <span className="text-2xl font-bold text-primary">{stableAmount}</span>
+          <span className="text-sm font-medium text-muted-foreground">{selectedToken}</span>
         </div>
       </div>
 
       <Separator />
 
-      {/* Détails */}
       <div className="space-y-2">
         <DetailRow label={t("price_per_gram")} value={priceStr} />
-        <DetailRow label={t("price_source")} value={isOracle ? t("oracle_price") : t("fallback_price")} />
-        <DetailRow label={t("fee")} value={feePercent} />
+        <DetailRow label={t("price_source")}
+          value={isOracle
+            ? (priceSource === 0 ? "Chainlink + Tellor" : priceSource === 1 ? "Chainlink" : "Tellor")
+            : t("fallback_price")} />
+        <DetailRow label={t("fees")} value={feePercent} />
       </div>
 
-      {/* Statut tx */}
       <TxStatus state={txState} hash={txHash} />
 
-      {/* Bouton */}
-      <Button
-        className="w-full"
-        size="lg"
-        variant="outline"
+      <Button className="w-full" size="lg" variant="outline"
         disabled={!gldInput || Number(gldInput) <= 0 || isLoading || !address}
-        onClick={handleSell}
-      >
+        onClick={handleSell}>
         {isLoading
-          ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> En cours...</>
-          : t("sell") + " GLD"
+          ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />En cours...</>
+          : `${t("sell")} GLD → ${selectedToken}`
         }
       </Button>
-
-      {!address && (
-        <p className="text-center text-sm text-muted-foreground">
-          {t("connect_to_sell")}
-        </p>
-      )}
+      {!address && <p className="text-center text-sm text-muted-foreground">{t("connect_to_sell")}</p>}
     </div>
   );
 }
 
-// ── Panneau Cashback ──────────────────────────────────────────────────────────
+// ── Panneau Cashback V3 ───────────────────────────────────────────────────────
+// previewCashback retourne (address[], uint256[]) — une ligne par token
 function CashbackPanel() {
   const { address } = useAccount();
   const { exchange } = useContracts();
-  const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
+  const [txHash, setTxHash]   = useState<`0x${string}` | undefined>();
   const [txState, setTxState] = useState<TxState>("idle");
   const { writeContractAsync } = useWriteContract();
   const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash: txHash });
@@ -422,69 +418,88 @@ function CashbackPanel() {
     query: { enabled: !!address },
   });
 
-  const cashback  = preview as [bigint, bigint, boolean] | undefined;
-  const amount    = cashback?.[0];
-  const fees      = cashback?.[1];
-  const eligible  = cashback?.[2] ?? false;
+  // (address[], uint256[])
+  const [tokens, amounts] = (preview as [`0x${string}`[], bigint[]] | undefined) ?? [[], []];
 
-  const handleClaim = async () => {
+  const totalCashback = amounts?.reduce((acc, v) => acc + v, 0n) ?? 0n;
+  const hasAnyCashback = totalCashback > 0n;
+
+  const handleClaimAll = async () => {
     try {
       setTxState("pending");
       const tx = await writeContractAsync({
-        ...exchange,
-        functionName: "claimCashback",
+        ...exchange, functionName: "claimAllCashback",
       });
       setTxState("confirming");
       setTxHash(tx);
       setTxState("success");
       refetch();
-    } catch {
-      setTxState("error");
-    }
+    } catch { setTxState("error"); }
+  };
+
+  const handleClaimOne = async (tokenAddr: `0x${string}`) => {
+    try {
+      setTxState("pending");
+      const tx = await writeContractAsync({
+        ...exchange, functionName: "claimCashback", args: [tokenAddr],
+      });
+      setTxState("confirming");
+      setTxHash(tx);
+      setTxState("success");
+      refetch();
+    } catch { setTxState("error"); }
   };
 
   const isLoading = txState === "pending" || txState === "confirming" || isConfirming;
 
-  if (!address) return null;
-  if (amount === 0n && fees === 0n) return null;
+  if (!address || !hasAnyCashback) return null;
+
+  const getSymbol = (addr: string) => {
+    if (addr.toLowerCase() === USDC_ADDRESS.toLowerCase()) return "USDC";
+    if (addr.toLowerCase() === EURC_ADDRESS.toLowerCase()) return "EURC";
+    return addr.slice(0, 6) + "...";
+  };
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 space-y-4">
       <div className="flex items-center gap-2">
         <span className="text-lg">🎁</span>
         <h3 className="font-semibold">Cashback disponible</h3>
-        {eligible
-          ? <Badge variant="default" className="text-xs">Éligible</Badge>
-          : <Badge variant="outline" className="text-xs">Inactif &gt; 6 mois</Badge>
-        }
+        <Badge variant="default" className="text-xs">Éligible</Badge>
       </div>
       <Separator />
-      <div className="space-y-2">
-        <DetailRow
-          label="Frais cumulés (24 mois)"
-          value={fees !== undefined ? `${parseFloat(formatUnits(fees, 6)).toFixed(4)} USDC` : "—"}
-        />
-        <DetailRow
-          label="Cashback (0.5%)"
-          value={amount !== undefined ? `${parseFloat(formatUnits(amount, 6)).toFixed(4)} USDC` : "—"}
-        />
-      </div>
-      {!eligible && (
-        <p className="text-xs text-muted-foreground">
-          Vous devez avoir effectué au moins un achat ou une vente dans les 6 derniers mois pour réclamer votre cashback.
-        </p>
-      )}
+
+      {tokens?.map((tokenAddr, i) => {
+        const amount = amounts?.[i] ?? 0n;
+        if (amount === 0n) return null;
+        const symbol = getSymbol(tokenAddr);
+        return (
+          <div key={tokenAddr} className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">{symbol}</p>
+              <p className="text-xs text-muted-foreground">
+                {parseFloat(formatUnits(amount, 6)).toFixed(4)} {symbol}
+              </p>
+            </div>
+            <Button size="sm" variant="outline"
+              disabled={isLoading}
+              onClick={() => handleClaimOne(tokenAddr)}>
+              Réclamer
+            </Button>
+          </div>
+        );
+      })}
+
       <TxStatus state={txState} hash={txHash} />
-      <Button
-        className="w-full"
-        disabled={!eligible || !amount || amount === 0n || isLoading}
-        onClick={handleClaim}
-      >
-        {isLoading
-          ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />En cours...</>
-          : `Réclamer ${amount !== undefined ? parseFloat(formatUnits(amount, 6)).toFixed(4) : "0"} USDC`
-        }
-      </Button>
+
+      {tokens && tokens.length > 1 && hasAnyCashback && (
+        <Button className="w-full" disabled={isLoading} onClick={handleClaimAll}>
+          {isLoading
+            ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />En cours...</>
+            : "Tout réclamer (USDC + EURC)"
+          }
+        </Button>
+      )}
     </div>
   );
 }
@@ -497,47 +512,35 @@ export default function TradePage() {
   useEffect(() => { setMounted(true); }, []);
 
   const { data: exchangePaused } = useReadContract({
-    ...exchange,
-    functionName: "paused",
+    ...exchange, functionName: "paused",
   });
 
   if (!mounted) return null;
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
-
-      {/* En-tête */}
       <div className="text-center space-y-2">
         <div className="flex items-center justify-center gap-2">
           <TrendingUp className="h-6 w-6 text-primary" />
           <h1 className="text-3xl font-bold">{t("title")}</h1>
         </div>
         <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
-        {exchangePaused && (
-          <Badge variant="destructive">Exchange pausé</Badge>
-        )}
+        {exchangePaused && <Badge variant="destructive">Exchange pausé</Badge>}
       </div>
 
-      {/* Panneau principal */}
       <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <Tabs defaultValue="buy">
           <TabsList className="w-full mb-6">
             <TabsTrigger value="buy"  className="flex-1">{t("buy")}</TabsTrigger>
             <TabsTrigger value="sell" className="flex-1">{t("sell")}</TabsTrigger>
           </TabsList>
-          <TabsContent value="buy">
-            <BuyPanel />
-          </TabsContent>
-          <TabsContent value="sell">
-            <SellPanel />
-          </TabsContent>
+          <TabsContent value="buy">  <BuyPanel />  </TabsContent>
+          <TabsContent value="sell"> <SellPanel /> </TabsContent>
         </Tabs>
       </div>
 
-      {/* Panneau cashback */}
       <CashbackPanel />
 
-      {/* Note légale */}
       <p className="text-center text-xs text-muted-foreground px-4">{t("irreversible_trade")}</p>
     </div>
   );
@@ -548,7 +551,6 @@ export async function getStaticProps({ params }: GetStaticPropsContext) {
   const messages = (await import(`@/messages/${safeLocale}.json`)).default;
   return { props: { locale: safeLocale, messages } };
 }
-
 export async function getStaticPaths() {
   return {
     paths: [{ params: { locale: "fr" } }, { params: { locale: "pt" } }],

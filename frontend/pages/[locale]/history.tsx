@@ -16,6 +16,8 @@ type LogEntry = {
   type: "BUY" | "SELL" | "DEPOSIT" | "WITHDRAWAL";
   address: string;
   amount: bigint;
+  token?: string;         // V3: adresse du stablecoin (USDC ou EURC)
+  stableAmount?: bigint;  // V3: montant stablecoin échangé
   price?: bigint;
   txHash: string;
   blockNumber: bigint;
@@ -29,9 +31,19 @@ function EntryRow({ entry, config }: {
 }) {
   const cfg = config[entry.type];
   const Icon = cfg.icon as React.FC<{ className?: string }>;
-  const isUSDC = entry.type === "DEPOSIT" || entry.type === "WITHDRAWAL";
-  const decimals = isUSDC ? 6 : 3;
-  const symbol   = isUSDC ? "USDC" : "GLD";
+  const isStable = entry.type === "DEPOSIT" || entry.type === "WITHDRAWAL";
+  const decimals = isStable ? 6 : 3;
+  // V3 : détecter le token pour BUY/SELL
+  const tokenSymbol = (() => {
+    if (!entry.token) return "USDC";
+    const t = entry.token.toLowerCase();
+    if (t === "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238") return "USDC";
+    if (t === "0x08210f9170f89ab7658f0b5e3ff39b0e03c594d4") return "EURC";
+    return "USDC";
+  })();
+  const symbol = isStable ? "USDC" : "GLD";
+  // Pour BUY/SELL on affiche aussi le stablecoin utilisé
+  const stableSymbol = tokenSymbol;
 
   return (
     <div className="flex items-center gap-4 py-3 border-b border-border last:border-0">
@@ -160,6 +172,8 @@ export default function HistoryPage() {
           type: "BUY" as const,
           address: l.args.buyer,
           amount: l.args.gldAmount,
+          token: l.args.token,          // V3: token USDC ou EURC
+          stableAmount: l.args.stableAmount, // V3
           price: l.args.price,
           txHash: l.transactionHash,
           blockNumber: l.blockNumber,
@@ -169,6 +183,8 @@ export default function HistoryPage() {
           type: "SELL" as const,
           address: l.args.seller,
           amount: l.args.gldAmount,
+          token: l.args.token,          // V3: token USDC ou EURC
+          stableAmount: l.args.stableAmount, // V3
           price: l.args.price,
           txHash: l.transactionHash,
           blockNumber: l.blockNumber,

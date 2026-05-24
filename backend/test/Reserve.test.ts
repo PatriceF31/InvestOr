@@ -59,7 +59,7 @@ describe("Reserve — Étapes 8 & 14 : Réserve + Proof of Reserve", () => {
     const TreasuryFactory = await ethers.getContractFactory("Treasury");
     const treasuryImpl = await TreasuryFactory.deploy();
     const treasuryInitData = treasuryImpl.interface.encodeFunctionData("initialize", [
-      owner.address, await mockUSDC.getAddress()
+      owner.address, await mockUSDC.getAddress(), ethers.ZeroAddress
     ]);
     const treasuryProxy = await ProxyFactory.deploy(await treasuryImpl.getAddress(), treasuryInitData);
     treasury = await ethers.getContractAt("Treasury", await treasuryProxy.getAddress());
@@ -104,7 +104,7 @@ describe("Reserve — Étapes 8 & 14 : Réserve + Proof of Reserve", () => {
 
   async function aliceBuys(usdcAmount: bigint) {
     await mockUSDC.connect(alice).approve(await exchange.getAddress(), usdcAmount);
-    await exchange.connect(alice).buy(usdcAmount);
+    await exchange.connect(alice).buy(usdcAmount, await mockUSDC.getAddress());
   }
 
   // ── 1. Initialisation ──────────────────────────────────────────────────────
@@ -165,7 +165,7 @@ describe("Reserve — Étapes 8 & 14 : Réserve + Proof of Reserve", () => {
       // Injecter 20 USDC supplémentaires directement dans le Treasury
       await mockUSDC.mint(owner.address, 20n * ONE_USDC);
       await mockUSDC.connect(owner).approve(await treasury.getAddress(), 20n * ONE_USDC);
-      await treasury.connect(owner).deposit(20n * ONE_USDC);
+      await treasury.connect(owner).deposit(20n * ONE_USDC, await mockUSDC.getAddress());
 
       const [,,, ratioAfter] = await reserve.checkReserve();
       expect(ratioAfter).to.be.gt(ratioBefore);
@@ -327,14 +327,14 @@ describe("recapitalize", () => {
       const before = await treasury.totalDeposited();
       await mockUSDC.mint(owner.address, 20n * ONE_USDC);
       await mockUSDC.connect(owner).approve(await reserve.getAddress(), 20n * ONE_USDC);
-      await reserve.connect(owner).recapitalize(20n * ONE_USDC);
+      await reserve.connect(owner).recapitalize(20n * ONE_USDC, await mockUSDC.getAddress());
       expect(await treasury.totalDeposited()).to.equal(before + 20n * ONE_USDC);
     });
 
     it("emit Recapitalized", async () => {
       await mockUSDC.mint(owner.address, 20n * ONE_USDC);
       await mockUSDC.connect(owner).approve(await reserve.getAddress(), 20n * ONE_USDC);
-      await expect(reserve.connect(owner).recapitalize(20n * ONE_USDC))
+      await expect(reserve.connect(owner).recapitalize(20n * ONE_USDC, await mockUSDC.getAddress()))
         .to.emit(reserve, "Recapitalized");
     });
 
@@ -343,7 +343,7 @@ describe("recapitalize", () => {
       const deficit = (await reserve.getReserveStatus()).deficitUsdc;
       await mockUSDC.mint(owner.address, deficit + ONE_USDC);
       await mockUSDC.connect(owner).approve(await reserve.getAddress(), deficit + ONE_USDC);
-      await reserve.connect(owner).recapitalize(deficit + ONE_USDC);
+      await reserve.connect(owner).recapitalize(deficit + ONE_USDC, await mockUSDC.getAddress());
       expect(await exchange.paused()).to.be.false;
     });
 
@@ -351,19 +351,19 @@ describe("recapitalize", () => {
       await mockUSDC.mint(alice.address, 5n * ONE_USDC);
       await mockUSDC.connect(alice).approve(await reserve.getAddress(), 5n * ONE_USDC);
       await expect(
-        reserve.connect(alice).recapitalize(5n * ONE_USDC)
+        reserve.connect(alice).recapitalize(5n * ONE_USDC, await mockUSDC.getAddress())
       ).to.be.revertedWithCustomError(reserve, "OwnableUnauthorizedAccount");
     });
 
     it("échoue avec montant nul", async () => {
       await expect(
-        reserve.connect(owner).recapitalize(0n)
+        reserve.connect(owner).recapitalize(0n, await mockUSDC.getAddress())
       ).to.be.revertedWithCustomError(reserve, "ZeroAmount");
     });
 
     it("échoue sans approbation USDC", async () => {
       await expect(
-        reserve.connect(owner).recapitalize(20n * ONE_USDC)
+        reserve.connect(owner).recapitalize(20n * ONE_USDC, await mockUSDC.getAddress())
       ).to.revert(ethers);
     });
   });

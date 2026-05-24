@@ -60,9 +60,11 @@ export default function PricePage() {
     functionName: "getPrice",
     query: { refetchInterval: 60_000 },
   });
-  const priceData   = priceRaw as [bigint, boolean] | undefined;
+  // getPrice() V3 retourne (uint256 price, uint8 source) — PAS (uint256, bool)
+  const priceData    = priceRaw as [bigint, number] | undefined;
   const onChainPrice = priceData?.[0];
-  const isOracle    = priceData?.[1] ?? false;
+  const priceSource  = priceData?.[1] ?? 3; // 0=médiane, 1=CL, 2=TL, 3=fallback
+  const isOracle     = priceSource <= 2;
 
   // ── Prix API REST (goldapi.io) ─────────────────────────────────────────────
   const { data: apiData, mutate: refreshApi } = useSWR(GOLD_API_URL, fetcher, {
@@ -121,7 +123,7 @@ export default function PricePage() {
           <Zap className="h-4 w-4 text-primary" />
           <h2 className="font-semibold">{t("source_oracle")}</h2>
           <Badge variant={isOracle ? "default" : "secondary"} className="text-xs">
-            {isOracle ? "Chainlink live" : "Fallback"}
+{priceSource === 0 ? "Chainlink + Tellor" : priceSource === 1 ? "Chainlink" : priceSource === 2 ? "Tellor" : "Fallback"}
           </Badge>
         </div>
         <div className="grid grid-cols-2 gap-4">

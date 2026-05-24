@@ -193,12 +193,20 @@ export default function AdminPage() {
         </ActionRow>
         <Separator />
         <ActionRow label={t("emergency_withdraw")}>
-          <div className="flex gap-2">
-            <Input placeholder="Adresse destinataire 0x..." value={emergencyTo} onChange={e => setEmergencyTo(e.target.value)} className="font-mono text-sm" />
-            <Button variant="destructive" disabled={!emergencyTo || isLoading}
-              onClick={() => exec(() => writeContractAsync({ ...treasury, functionName: "emergencyWithdraw", args: [emergencyTo as `0x${string}`] }))}>
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "⚠️"}
-            </Button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Input placeholder="Adresse destinataire 0x..." value={emergencyTo} onChange={e => setEmergencyTo(e.target.value)} className="font-mono text-sm" />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="destructive" size="sm" disabled={!emergencyTo || isLoading}
+                onClick={() => exec(() => writeContractAsync({ ...treasury, functionName: "emergencyWithdraw", args: [emergencyTo as `0x${string}`, "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as `0x${string}`] }))}>
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "⚠️ USDC"}
+              </Button>
+              <Button variant="destructive" size="sm" disabled={!emergencyTo || isLoading}
+                onClick={() => exec(() => writeContractAsync({ ...treasury, functionName: "emergencyWithdraw", args: [emergencyTo as `0x${string}`, "0x08210F9170F89Ab7658F0B5E3fF39b0E03C594D4" as `0x${string}`] }))}>
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "⚠️ EURC"}
+              </Button>
+            </div>
           </div>
         </ActionRow>
       </AdminCard>
@@ -216,7 +224,7 @@ export default function AdminPage() {
             disabled={isLoading}
             onClick={() => exec(() => writeContractAsync({
               ...reserve,
-              functionName: exchangePaused ? "proofOfReserve" : "proofOfReserve",
+              functionName: "proofOfReserve", // Vérifie le ratio et pause/unpause automatiquement
             }))}>
             {exchangePaused
               ? <><Unlock className="h-4 w-4 mr-2" />{t("unpause_exchange")}</>

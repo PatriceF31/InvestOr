@@ -794,6 +794,7 @@ export const GLDABI = [
 ] as const;
 
 // ── Treasury ──────────────────────────────────────────────
+// ── Treasury ──────────────────────────────────────────────
 export const TreasuryABI = [
   {
     "inputs": [],
@@ -891,6 +892,11 @@ export const TreasuryABI = [
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "ReentrancyGuardReentrantCall",
+    "type": "error"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -929,6 +935,17 @@ export const TreasuryABI = [
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "UnsupportedToken",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "ZeroAddress",
     "type": "error"
@@ -944,7 +961,13 @@ export const TreasuryABI = [
       {
         "indexed": true,
         "internalType": "address",
-        "name": "user",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "from",
         "type": "address"
       },
       {
@@ -960,6 +983,12 @@ export const TreasuryABI = [
   {
     "anonymous": false,
     "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
       {
         "indexed": true,
         "internalType": "address",
@@ -1014,6 +1043,12 @@ export const TreasuryABI = [
       {
         "indexed": true,
         "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "to",
         "type": "address"
       },
@@ -1057,6 +1092,32 @@ export const TreasuryABI = [
       }
     ],
     "name": "Paused",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "TokenAdded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "TokenRemoved",
     "type": "event"
   },
   {
@@ -1110,7 +1171,13 @@ export const TreasuryABI = [
       {
         "indexed": true,
         "internalType": "address",
-        "name": "user",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "to",
         "type": "address"
       },
       {
@@ -1140,19 +1207,13 @@ export const TreasuryABI = [
     "inputs": [
       {
         "internalType": "address",
-        "name": "user",
+        "name": "token",
         "type": "address"
       }
     ],
-    "name": "balanceOf",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
+    "name": "addSupportedToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1161,6 +1222,11 @@ export const TreasuryABI = [
         "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       }
     ],
     "name": "deposit",
@@ -1174,11 +1240,29 @@ export const TreasuryABI = [
         "internalType": "address",
         "name": "to",
         "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       }
     ],
     "name": "emergencyWithdraw",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "eurc",
+    "outputs": [
+      {
+        "internalType": "contract IERC20",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1192,11 +1276,53 @@ export const TreasuryABI = [
         "internalType": "address",
         "name": "usdcAddress",
         "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "eurcAddress",
+        "type": "address"
       }
     ],
     "name": "initialize",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "injectCapital",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "isSupportedToken",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1223,6 +1349,11 @@ export const TreasuryABI = [
         "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       }
     ],
     "name": "operatorWithdraw",
@@ -1277,8 +1408,47 @@ export const TreasuryABI = [
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "removeSupportedToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "reserve",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "eurcAddress",
+        "type": "address"
+      }
+    ],
+    "name": "setEurc",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1300,6 +1470,19 @@ export const TreasuryABI = [
     "inputs": [
       {
         "internalType": "address",
+        "name": "newReserve",
+        "type": "address"
+      }
+    ],
+    "name": "setReserve",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "newUsdc",
         "type": "address"
       }
@@ -1312,6 +1495,38 @@ export const TreasuryABI = [
   {
     "inputs": [],
     "name": "totalDeposited",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalDepositedAllTokens",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "total",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "totalDepositedByToken",
     "outputs": [
       {
         "internalType": "uint256",
@@ -1379,6 +1594,11 @@ export const TreasuryABI = [
         "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       }
     ],
     "name": "withdraw",
@@ -1438,19 +1658,8 @@ export const ExchangeABI = [
     "type": "error"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "requested",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "available",
-        "type": "uint256"
-      }
-    ],
-    "name": "InsufficientUsdcInTreasury",
+    "inputs": [],
+    "name": "InactiveAccount",
     "type": "error"
   },
   {
@@ -1460,7 +1669,7 @@ export const ExchangeABI = [
   },
   {
     "inputs": [],
-    "name": "InvalidOraclePrice",
+    "name": "NoCashbackAvailable",
     "type": "error"
   },
   {
@@ -1496,6 +1705,11 @@ export const ExchangeABI = [
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "ReentrancyGuardReentrantCall",
+    "type": "error"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -1504,22 +1718,6 @@ export const ExchangeABI = [
       }
     ],
     "name": "SafeERC20FailedOperation",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "updatedAt",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "maxAge",
-        "type": "uint256"
-      }
-    ],
-    "name": "StaleOracleData",
     "type": "error"
   },
   {
@@ -1539,6 +1737,17 @@ export const ExchangeABI = [
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "UnsupportedToken",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "ZeroAddress",
     "type": "error"
@@ -1547,6 +1756,50 @@ export const ExchangeABI = [
     "inputs": [],
     "name": "ZeroAmount",
     "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oldBps",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "CashbackBpsUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "CashbackClaimed",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -1572,6 +1825,25 @@ export const ExchangeABI = [
       }
     ],
     "name": "ContractsUnpaused",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "oldEurc",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newEurc",
+        "type": "address"
+      }
+    ],
+    "name": "EurcUpdated",
     "type": "event"
   },
   {
@@ -1720,13 +1992,38 @@ export const ExchangeABI = [
       {
         "indexed": true,
         "internalType": "address",
+        "name": "oldOracle",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOracle",
+        "type": "address"
+      }
+    ],
+    "name": "TellorOracleUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "buyer",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
         "type": "address"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "usdcAmount",
+        "name": "stableAmount",
         "type": "uint256"
       },
       {
@@ -1755,6 +2052,12 @@ export const ExchangeABI = [
         "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
         "indexed": false,
         "internalType": "uint256",
         "name": "gldAmount",
@@ -1763,7 +2066,7 @@ export const ExchangeABI = [
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "usdcAmount",
+        "name": "stableAmount",
         "type": "uint256"
       },
       {
@@ -1804,6 +2107,45 @@ export const ExchangeABI = [
   },
   {
     "inputs": [],
+    "name": "BASIS_POINTS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "TELLOR_DECIMALS_FACTOR",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "TELLOR_XAU_USD_QUERY_ID",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "UPGRADE_INTERFACE_VERSION",
     "outputs": [
       {
@@ -1819,13 +2161,77 @@ export const ExchangeABI = [
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "usdcAmount",
+        "name": "stableAmount",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       }
     ],
     "name": "buy",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "cashbackBps",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "claimAllCashback",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "claimCashback",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "deployedAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "eurc",
+    "outputs": [
+      {
+        "internalType": "contract IERC20",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1868,6 +2274,97 @@ export const ExchangeABI = [
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "feesBySlot",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "feesBySlotV2",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getOracleStatus",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "chainlinkPrice",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "chainlinkOk",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "tellorPrice",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "tellorOk",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "activePrice",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint8",
+        "name": "activeSource",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "getPrice",
     "outputs": [
@@ -1877,9 +2374,9 @@ export const ExchangeABI = [
         "type": "uint256"
       },
       {
-        "internalType": "bool",
-        "name": "isOracle",
-        "type": "bool"
+        "internalType": "uint8",
+        "name": "source",
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -1896,6 +2393,24 @@ export const ExchangeABI = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_deployedAt",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_cashbackBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "initCashback",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1929,6 +2444,25 @@ export const ExchangeABI = [
     "name": "initialize",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "lastActivityAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1981,8 +2515,13 @@ export const ExchangeABI = [
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "usdcAmount",
+        "name": "stableAmount",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       }
     ],
     "name": "previewBuy",
@@ -1999,16 +2538,45 @@ export const ExchangeABI = [
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "name": "previewCashback",
+    "outputs": [
+      {
+        "internalType": "address[]",
+        "name": "tokens",
+        "type": "address[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "amounts",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "gldAmount",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       }
     ],
     "name": "previewSell",
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "usdcAmount",
+        "name": "stableAmount",
         "type": "uint256"
       }
     ],
@@ -2054,9 +2622,40 @@ export const ExchangeABI = [
         "internalType": "uint256",
         "name": "gldAmount",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       }
     ],
     "name": "sell",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "newBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "setCashbackBps",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "eurcAddress",
+        "type": "address"
+      }
+    ],
+    "name": "setEurc",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -2130,6 +2729,45 @@ export const ExchangeABI = [
     "inputs": [
       {
         "internalType": "address",
+        "name": "newOracle",
+        "type": "address"
+      }
+    ],
+    "name": "setTellorOracle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newTreasury",
+        "type": "address"
+      }
+    ],
+    "name": "setTreasury",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "tellorOracle",
+    "outputs": [
+      {
+        "internalType": "contract ITellorOracle",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "newOwner",
         "type": "address"
       }
@@ -2188,142 +2826,6 @@ export const ExchangeABI = [
       }
     ],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "cashbackBps",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "claimCashback",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "deployedAt",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "feesBySlot",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_deployedAt",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_cashbackBps",
-        "type": "uint256"
-      }
-    ],
-    "name": "initCashback",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "lastActivityAt",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      }
-    ],
-    "name": "previewCashback",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "cashbackAmount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "totalFees",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "isEligible",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "newBps",
-        "type": "uint256"
-      }
-    ],
-    "name": "setCashbackBps",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   }
 ] as const;
@@ -2421,6 +2923,11 @@ export const ReserveABI = [
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "ReentrancyGuardReentrantCall",
+    "type": "error"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -2512,6 +3019,25 @@ export const ReserveABI = [
     "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
+        "name": "oldAddr",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newAddr",
+        "type": "address"
+      }
+    ],
+    "name": "LingotOrUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": false,
         "internalType": "uint256",
         "name": "oldRatio",
@@ -2545,19 +3071,6 @@ export const ReserveABI = [
     ],
     "name": "OracleMaxAgeUpdated",
     "type": "event"
-  },
-  {
-    "inputs": [],
-    "name": "getRecapitalizers",
-    "outputs": [
-      {
-        "internalType": "address[]",
-        "name": "",
-        "type": "address[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
   },
   {
     "anonymous": false,
@@ -2620,6 +3133,32 @@ export const ReserveABI = [
       }
     ],
     "name": "Recapitalized",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "RecapitalizerAdded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "RecapitalizerRemoved",
     "type": "event"
   },
   {
@@ -2702,6 +3241,25 @@ export const ReserveABI = [
       {
         "indexed": true,
         "internalType": "address",
+        "name": "oldOracle",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOracle",
+        "type": "address"
+      }
+    ],
+    "name": "TellorOracleUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "implementation",
         "type": "address"
       }
@@ -2737,6 +3295,32 @@ export const ReserveABI = [
   },
   {
     "inputs": [],
+    "name": "TELLOR_DECIMALS_FACTOR",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "TELLOR_XAU_USD_QUERY_ID",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "UPGRADE_INTERFACE_VERSION",
     "outputs": [
       {
@@ -2746,6 +3330,19 @@ export const ReserveABI = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "addRecapitalizer",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -2791,12 +3388,58 @@ export const ReserveABI = [
   },
   {
     "inputs": [],
+    "name": "getOracleStatus",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "chainlinkPrice",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "chainlinkOk",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "tellorPrice",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "tellorOk",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "activePrice",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "getPrice",
     "outputs": [
       {
         "internalType": "uint256",
         "name": "price",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getRecapitalizers",
+    "outputs": [
+      {
+        "internalType": "address[]",
+        "name": "",
+        "type": "address[]"
       }
     ],
     "stateMutability": "view",
@@ -2871,6 +3514,24 @@ export const ReserveABI = [
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "deployedAt_",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "cashbackBps_",
+        "type": "uint256"
+      }
+    ],
+    "name": "initExchangeCashback",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "initialOwner",
         "type": "address"
@@ -2940,6 +3601,19 @@ export const ReserveABI = [
         "internalType": "bool",
         "name": "",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "lingotOr",
+    "outputs": [
+      {
+        "internalType": "contract ILingotOr",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -3023,9 +3697,65 @@ export const ReserveABI = [
         "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       }
     ],
     "name": "recapitalize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "recapitalizerList",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "recapitalizers",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "removeRecapitalizer",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -3040,12 +3770,12 @@ export const ReserveABI = [
   {
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "newRatioBps",
-        "type": "uint256"
+        "internalType": "address",
+        "name": "newExchange",
+        "type": "address"
       }
     ],
-    "name": "setMinRatio",
+    "name": "setExchange",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -3054,37 +3784,11 @@ export const ReserveABI = [
     "inputs": [
       {
         "internalType": "address",
-        "name": "newOracle",
+        "name": "eurcAddress",
         "type": "address"
       }
     ],
-    "name": "setOracle",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "newMaxAge",
-        "type": "uint256"
-      }
-    ],
-    "name": "setOracleMaxAge",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-{
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "newOracle",
-        "type": "address"
-      }
-    ],
-    "name": "setExchangeOracle",
+    "name": "setExchangeEurc",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -3132,6 +3836,19 @@ export const ReserveABI = [
     "inputs": [
       {
         "internalType": "address",
+        "name": "newOracle",
+        "type": "address"
+      }
+    ],
+    "name": "setExchangeOracle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "newOwner",
         "type": "address"
       }
@@ -3145,11 +3862,11 @@ export const ReserveABI = [
     "inputs": [
       {
         "internalType": "address",
-        "name": "account",
+        "name": "newOracle",
         "type": "address"
       }
     ],
-    "name": "addRecapitalizer",
+    "name": "setExchangeTellorOracle",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -3158,11 +3875,11 @@ export const ReserveABI = [
     "inputs": [
       {
         "internalType": "address",
-        "name": "account",
+        "name": "newTreasury",
         "type": "address"
       }
     ],
-    "name": "removeRecapitalizer",
+    "name": "setExchangeTreasury",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -3171,16 +3888,75 @@ export const ReserveABI = [
     "inputs": [
       {
         "internalType": "address",
-        "name": "",
+        "name": "newAddr",
         "type": "address"
       }
     ],
-    "name": "recapitalizers",
+    "name": "setLingotOr",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "newRatioBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "setMinRatio",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOracle",
+        "type": "address"
+      }
+    ],
+    "name": "setOracle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "newMaxAge",
+        "type": "uint256"
+      }
+    ],
+    "name": "setOracleMaxAge",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOracle",
+        "type": "address"
+      }
+    ],
+    "name": "setTellorOracle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "tellorOracle",
     "outputs": [
       {
-        "internalType": "bool",
+        "internalType": "contract ITellorOracleReserve",
         "name": "",
-        "type": "bool"
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -3216,6 +3992,19 @@ export const ReserveABI = [
     "inputs": [
       {
         "internalType": "address",
+        "name": "newImpl",
+        "type": "address"
+      }
+    ],
+    "name": "upgradeExchange",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "newImplementation",
         "type": "address"
       },
@@ -3229,24 +4018,9 @@ export const ReserveABI = [
     "outputs": [],
     "stateMutability": "payable",
     "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "lingotOr",
-    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "address", "name": "newAddr", "type": "address"}],
-    "name": "setLingotOr",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
   }
 ] as const;
 
-// ── EventLogger ──────────────────────────────────────────────
 export const EventLoggerABI = [
   {
     "inputs": [],

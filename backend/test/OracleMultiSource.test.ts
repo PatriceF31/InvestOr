@@ -76,7 +76,7 @@ describe("Oracle multi-sources — Étape 7 : Chainlink + Tellor (Exchange)", ()
     const TreasuryFactory   = await ethers.getContractFactory("Treasury");
     const treasuryImpl      = await TreasuryFactory.deploy();
     const treasuryInitData  = treasuryImpl.interface.encodeFunctionData("initialize", [
-      owner.address, await mockUSDC.getAddress(),
+      owner.address, await mockUSDC.getAddress(), ethers.ZeroAddress,
     ]);
     const treasuryProxy = await ProxyFactory.deploy(await treasuryImpl.getAddress(), treasuryInitData);
     treasury = await ethers.getContractAt("Treasury", await treasuryProxy.getAddress());
@@ -105,14 +105,14 @@ describe("Oracle multi-sources — Étape 7 : Chainlink + Tellor (Exchange)", ()
     await mockUSDC.mint(alice.address, THOUSAND_USDC);
     await mockUSDC.mint(owner.address, THOUSAND_USDC * 10n);
     await mockUSDC.connect(owner).approve(await treasury.getAddress(), THOUSAND_USDC * 10n);
-    await treasury.connect(owner).deposit(THOUSAND_USDC * 10n);
+    await treasury.connect(owner).deposit(THOUSAND_USDC * 10n, await mockUSDC.getAddress());
   });
 
   // ─── Helper ──────────────────────────────────────────────────────────────
 
   async function aliceBuys(usdcAmount: bigint) {
     await mockUSDC.connect(alice).approve(await exchange.getAddress(), usdcAmount);
-    await exchange.connect(alice).buy(usdcAmount);
+    await exchange.connect(alice).buy(usdcAmount, await mockUSDC.getAddress());
   }
 
   // ── 1. Configuration initiale ─────────────────────────────────────────────
@@ -171,7 +171,7 @@ describe("Oracle multi-sources — Étape 7 : Chainlink + Tellor (Exchange)", ()
       await chainlink.setPrice(PRICE_CL_90);
       await tellor.setPrice(PRICE_TL_100);
 
-      const gldAmount = await exchange.previewBuy(HUNDRED_USDC);
+      const gldAmount = await exchange.previewBuy(HUNDRED_USDC, await mockUSDC.getAddress());
       // médiane = $95/g → 100_000_000 * 100_000 / 9_500_000_000 = 1052
       expect(gldAmount).to.equal(1052n);
     });
@@ -180,7 +180,7 @@ describe("Oracle multi-sources — Étape 7 : Chainlink + Tellor (Exchange)", ()
       await chainlink.setPrice(PRICE_CL_90);
       await tellor.setPrice(PRICE_TL_100);
 
-      const expected = await exchange.previewBuy(HUNDRED_USDC);
+      const expected = await exchange.previewBuy(HUNDRED_USDC, await mockUSDC.getAddress());
       await aliceBuys(HUNDRED_USDC);
       expect(await gld.balanceOf(alice.address)).to.equal(expected);
     });
@@ -233,7 +233,7 @@ describe("Oracle multi-sources — Étape 7 : Chainlink + Tellor (Exchange)", ()
     });
 
     it("achat fonctionne correctement en mode Chainlink seul", async () => {
-      const expected = await exchange.previewBuy(HUNDRED_USDC);
+      const expected = await exchange.previewBuy(HUNDRED_USDC, await mockUSDC.getAddress());
       await aliceBuys(HUNDRED_USDC);
       expect(await gld.balanceOf(alice.address)).to.equal(expected);
     });
@@ -277,7 +277,7 @@ describe("Oracle multi-sources — Étape 7 : Chainlink + Tellor (Exchange)", ()
     });
 
     it("achat fonctionne correctement en mode Tellor seul", async () => {
-      const expected = await exchange.previewBuy(HUNDRED_USDC);
+      const expected = await exchange.previewBuy(HUNDRED_USDC, await mockUSDC.getAddress());
       await aliceBuys(HUNDRED_USDC);
       expect(await gld.balanceOf(alice.address)).to.equal(expected);
     });
@@ -336,7 +336,7 @@ describe("Oracle multi-sources — Étape 7 : Chainlink + Tellor (Exchange)", ()
     });
 
     it("achat fonctionne avec le fallback", async () => {
-      const expected = await exchange.previewBuy(HUNDRED_USDC);
+      const expected = await exchange.previewBuy(HUNDRED_USDC, await mockUSDC.getAddress());
       await aliceBuys(HUNDRED_USDC);
       expect(await gld.balanceOf(alice.address)).to.equal(expected);
     });
@@ -469,16 +469,16 @@ describe("Oracle multi-sources — Étape 7 : Chainlink + Tellor (Exchange)", ()
       await tellor.setPrice(90_00000000n * 10n ** 10n); // TL reste $90
 
       // Injecter USDC si nécessaire
-      const usdcNeeded = await exchange.previewSell(gldBalance);
+      const usdcNeeded = await exchange.previewSell(gldBalance, await mockUSDC.getAddress());
       const treasuryBal = await mockUSDC.balanceOf(await treasury.getAddress());
       if (usdcNeeded > treasuryBal) {
         const extra = usdcNeeded - treasuryBal;
         await mockUSDC.mint(owner.address, extra);
         await mockUSDC.connect(owner).approve(await treasury.getAddress(), extra);
-        await treasury.connect(owner).deposit(extra);
+        await treasury.connect(owner).deposit(extra, await mockUSDC.getAddress());
       }
 
-      await exchange.connect(alice).sell(gldBalance);
+      await exchange.connect(alice).sell(gldBalance, await mockUSDC.getAddress());
       const usdcAfter = await mockUSDC.balanceOf(alice.address);
 
       // Alice récupère plus que ses 100 USDC initiaux (plus-value grâce à la hausse)
@@ -491,12 +491,13 @@ describe("Oracle multi-sources — Étape 7 : Chainlink + Tellor (Exchange)", ()
       const medianPrice = PRICE_MEDIAN_90_100;
 
       await mockUSDC.connect(alice).approve(await exchange.getAddress(), HUNDRED_USDC);
-      await expect(exchange.connect(alice).buy(HUNDRED_USDC))
+      await expect(exchange.connect(alice).buy(HUNDRED_USDC, await mockUSDC.getAddress()))
         .to.emit(exchange, "TokensBought")
         .withArgs(
           alice.address,
+          await mockUSDC.getAddress(),
           HUNDRED_USDC,
-          await exchange.previewBuy(HUNDRED_USDC),
+          await exchange.previewBuy(HUNDRED_USDC, await mockUSDC.getAddress()),
           medianPrice
         );
     });

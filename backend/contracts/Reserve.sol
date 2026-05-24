@@ -17,11 +17,14 @@ interface IGLDReserve {
     function paused() external view returns (bool);
 }
 
-/// @dev Interface Treasury
+/// @dev Interface Treasury V2 multi-token
 interface ITreasuryReserve {
+    /// @notice Total USDC + EURC déposés agrégés (1:1 USD sur Sepolia)
     function totalDeposited() external view returns (uint256);
     function usdc() external view returns (address);
-    function injectCapital(uint256 amount) external;
+    function eurc() external view returns (address);
+    /// @notice Injection capital V2 — paramètre token requis
+    function injectCapital(uint256 amount, address token) external;
 }
 
 /// @dev Interface Oracle Chainlink
@@ -54,6 +57,7 @@ interface IExchange {
     function setFeeBps(uint256 newFeeBps) external;
     function setFeeCollector(address newCollector) external;
     function initCashback(uint256 deployedAt_, uint256 cashbackBps_) external;
+    function setEurc(address eurcAddress) external;  // V3
 }
 
 /// @dev Interface LingotOr pour le Proof of Reserve en mode grammes
@@ -356,17 +360,19 @@ contract Reserve is
         _;
     }
 
-    /// @notice Injecte des USDC dans le Treasury pour restaurer le ratio
-    function recapitalize(uint256 amount) external onlyRecapitalizerOrOwner nonReentrant {
+    /// @notice Injecte des USDC ou EURC dans le Treasury pour restaurer le ratio
+    /// @param amount Montant à injecter
+    /// @param token  Token à injecter (USDC ou EURC) — défaut USDC si address(0)
+    function recapitalize(uint256 amount, address token) external onlyRecapitalizerOrOwner nonReentrant {
         if (amount == 0) revert ZeroAmount();
 
-        address usdcAddr = treasury.usdc();
-        IERC20 usdc = IERC20(usdcAddr);
+        // Si token = address(0), on utilise USDC par défaut
+        address tokenAddr = (token == address(0)) ? treasury.usdc() : token;
+        IERC20 stablecoin = IERC20(tokenAddr);
 
-        usdc.safeTransferFrom(msg.sender, address(this), amount);
-
-        usdc.forceApprove(address(treasury), amount);
-        ITreasuryReserve(address(treasury)).injectCapital(amount);
+        stablecoin.safeTransferFrom(msg.sender, address(this), amount);
+        stablecoin.forceApprove(address(treasury), amount);
+        ITreasuryReserve(address(treasury)).injectCapital(amount, tokenAddr);
 
         (, , , uint256 newRatio) = checkReserve();
 
@@ -441,6 +447,11 @@ contract Reserve is
 
     function setExchangeFeeCollector(address newCollector) external onlyOwner {
         IExchange(address(exchange)).setFeeCollector(newCollector);
+    }
+
+    /// @notice Configure l'adresse EURC sur Exchange (V3)
+    function setExchangeEurc(address eurcAddress) external onlyOwner {
+        IExchange(address(exchange)).setEurc(eurcAddress);
     }
 
     function addRecapitalizer(address account) external onlyOwner {

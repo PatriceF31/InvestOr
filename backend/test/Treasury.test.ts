@@ -1,371 +1,331 @@
 import { expect } from "chai";
 import hre from "hardhat";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
-import TreasuryModule from "../ignition/modules/Treasury.js";
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
-const ONE_USDC        = 1_000_000n;        // 1 USDC  = 1 000 000 unités (6 décimales)
-const HUNDRED_USDC    = 100n * ONE_USDC;   // 100 USDC
-const THOUSAND_USDC   = 1000n * ONE_USDC;  // 1 000 USDC
+const ONE_USDC      = 1_000_000n;
+const HUNDRED_USDC  = 100n * ONE_USDC;
+const THOUSAND_USDC = 1_000n * ONE_USDC;
+const ONE_EURC      = 1_000_000n;
+const HUNDRED_EURC  = 100n * ONE_EURC;
+const THOUSAND_EURC = 1_000n * ONE_EURC;
 
 // ─── Suite principale ─────────────────────────────────────────────────────────
 
-describe("Treasury — Étape 3 : dépôt et retrait USDC", () => {
-  let treasury: any;
-  let mockUSDC: any;
-  let owner: HardhatEthersSigner;
-  let alice: HardhatEthersSigner;
-  let bob: HardhatEthersSigner;
-  let ethers: any;
-  let ignition: any;
+describe("Treasury V2 — Multi-token USDC + EURC", () => {
+  let treasury:  any;
+  let mockUSDC:  any;
+  let mockEURC:  any;
+  let owner:     HardhatEthersSigner;
+  let alice:     HardhatEthersSigner;
+  let bob:       HardhatEthersSigner;
+  let operator:  HardhatEthersSigner;
+  let ethers:    any;
 
   beforeEach(async () => {
     const connection = await hre.network.connect();
-    ethers   = (connection as any).ethers;
-    ignition = (connection as any).ignition;
+    ethers = (connection as any).ethers;
+    [owner, alice, bob, operator] = await ethers.getSigners();
 
-    [owner, alice, bob] = await ethers.getSigners();
+    const ProxyFactory = await ethers.getContractFactory("InvestOrProxy");
 
-    // 1. Déployer MockUSDC
-    const MockUSDCFactory = await ethers.getContractFactory("MockUSDC");
-    mockUSDC = await MockUSDCFactory.deploy();
+    // Mock tokens
+    mockUSDC = await (await ethers.getContractFactory("MockUSDC")).deploy();
+    mockEURC = await (await ethers.getContractFactory("MockUSDC")).deploy(); // même contrat, nom différent
 
-    // 2. Déployer Treasury via Ignition
-    const { proxy } = await ignition.deploy(TreasuryModule, {
-      parameters: {
-        TreasuryModule: {
-          initialOwner: owner.address,
-          usdcAddress:  await mockUSDC.getAddress(),
-        },
-      },
-    });
-    treasury = await ethers.getContractAt("Treasury", await proxy.getAddress());
+    // Treasury V2
+    const treasuryImpl  = await (await ethers.getContractFactory("contracts/Treasury.sol:Treasury")).deploy();
+    const treasuryProxy = await ProxyFactory.deploy(
+      await treasuryImpl.getAddress(),
+      treasuryImpl.interface.encodeFunctionData("initialize", [
+        owner.address,
+        await mockUSDC.getAddress(),
+        await mockEURC.getAddress(),
+      ])
+    );
+    treasury = await ethers.getContractAt("contracts/Treasury.sol:Treasury", await treasuryProxy.getAddress());
 
-    // 3. Mint USDC pour owner, alice et bob
-    await mockUSDC.mint(owner.address, THOUSAND_USDC);
-    await mockUSDC.mint(alice.address, THOUSAND_USDC);
-    await mockUSDC.mint(bob.address,   THOUSAND_USDC);
+    // Configurer opérateur
+    await treasury.connect(owner).setOperator(operator.address);
+
+    // Fonds pour les tests
+    await mockUSDC.mint(operator.address, THOUSAND_USDC * 10n);
+    await mockEURC.mint(operator.address, THOUSAND_EURC * 10n);
+    await mockUSDC.connect(operator).approve(await treasury.getAddress(), THOUSAND_USDC * 10n);
+    await mockEURC.connect(operator).approve(await treasury.getAddress(), THOUSAND_EURC * 10n);
   });
 
   // ── 1. Initialisation ──────────────────────────────────────────────────────
 
   describe("Initialisation", () => {
-    it("doit avoir la bonne adresse USDC", async () => {
-      expect(await treasury.usdc()).to.equal(await mockUSDC.getAddress());
-    });
-
     it("doit avoir le bon owner", async () => {
       expect(await treasury.owner()).to.equal(owner.address);
+    });
+
+    it("USDC est supporté après initialize", async () => {
+      expect(await treasury.isSupportedToken(await mockUSDC.getAddress())).to.be.true;
+    });
+
+    it("EURC est supporté après initialize", async () => {
+      expect(await treasury.isSupportedToken(await mockEURC.getAddress())).to.be.true;
     });
 
     it("totalDeposited initial = 0", async () => {
       expect(await treasury.totalDeposited()).to.equal(0n);
     });
 
-    it("ne doit pas pouvoir être initialisé une seconde fois", async () => {
+    it("totalDepositedAllTokens initial = 0", async () => {
+      expect(await treasury.totalDepositedAllTokens()).to.equal(0n);
+    });
+
+    it("ne peut pas être initialisé une seconde fois", async () => {
       await expect(
-        treasury.initialize(alice.address, await mockUSDC.getAddress())
-      ).to.be.revertedWithCustomError(treasury, "InvalidInitialization");
+        treasury.initialize(owner.address, await mockUSDC.getAddress(), ethers.ZeroAddress)
+      ).to.revert(ethers);
     });
   });
 
-  // ── 2. Dépôt ──────────────────────────────────────────────────────────────
+  // ── 2. Dépôt USDC ─────────────────────────────────────────────────────────
 
-  describe("Deposit", () => {
-    it("le owner peut déposer des USDC (admin/collatéral)", async () => {
-      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await treasury.connect(owner).deposit(HUNDRED_USDC);
+  describe("Deposit — USDC", () => {
+    it("opérateur peut déposer des USDC", async () => {
+      await treasury.connect(operator).deposit(HUNDRED_USDC, await mockUSDC.getAddress());
+      expect(await treasury.totalDepositedByToken(await mockUSDC.getAddress())).to.equal(HUNDRED_USDC);
+    });
 
+    it("totalDeposited agrège USDC", async () => {
+      await treasury.connect(operator).deposit(HUNDRED_USDC, await mockUSDC.getAddress());
       expect(await treasury.totalDeposited()).to.equal(HUNDRED_USDC);
     });
 
-    it("le solde USDC du treasury augmente après dépôt", async () => {
-      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await treasury.connect(owner).deposit(HUNDRED_USDC);
-
-      expect(
-        await mockUSDC.balanceOf(await treasury.getAddress())
-      ).to.equal(HUNDRED_USDC);
-    });
-
-    it("un non-opérateur ne peut pas déposer", async () => {
-      await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await expect(
-        treasury.connect(alice).deposit(HUNDRED_USDC)
-      ).to.be.revertedWithCustomError(treasury, "UnauthorizedOperator");
-    });
-
-    it("un non-opérateur ne peut pas déposer (bob)", async () => {
-      await mockUSDC.connect(bob).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await expect(
-        treasury.connect(bob).deposit(HUNDRED_USDC)
-      ).to.be.revertedWithCustomError(treasury, "UnauthorizedOperator");
-    });
-
-    it("dépôts cumulatifs par le owner", async () => {
-      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC * 2n);
-      await treasury.connect(owner).deposit(HUNDRED_USDC);
-      await treasury.connect(owner).deposit(HUNDRED_USDC);
-
-      expect(await treasury.totalDeposited()).to.equal(HUNDRED_USDC * 2n);
-    });
-
-    it("emit l'event Deposited", async () => {
-      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await expect(treasury.connect(owner).deposit(HUNDRED_USDC))
+    it("emit Deposited avec le bon token", async () => {
+      await expect(treasury.connect(operator).deposit(HUNDRED_USDC, await mockUSDC.getAddress()))
         .to.emit(treasury, "Deposited")
-        .withArgs(owner.address, HUNDRED_USDC);
+        .withArgs(await mockUSDC.getAddress(), operator.address, HUNDRED_USDC);
     });
 
-    it("ne peut pas déposer un montant nul", async () => {
+    it("échoue avec montant nul", async () => {
       await expect(
-        treasury.connect(owner).deposit(0n)
+        treasury.connect(operator).deposit(0n, await mockUSDC.getAddress())
       ).to.be.revertedWithCustomError(treasury, "ZeroAmount");
     });
 
-    it("échoue sans approbation USDC préalable", async () => {
-      await expect(
-        treasury.connect(alice).deposit(HUNDRED_USDC)
-      ).to.revert(ethers);
-    });
-
-    it("échoue si allowance insuffisante", async () => {
-      await mockUSDC.connect(alice).approve(await treasury.getAddress(), ONE_USDC);
-      await expect(
-        treasury.connect(alice).deposit(HUNDRED_USDC)
-      ).to.revert(ethers);
-    });
-  });
-
-  // ── 3. Retrait ────────────────────────────────────────────────────────────
-
-describe("Withdraw", () => {
-    beforeEach(async () => {
-      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await treasury.connect(owner).deposit(HUNDRED_USDC);
-    });
-
-    it("le owner peut retirer des USDC", async () => {
-      await treasury.connect(owner).withdraw(HUNDRED_USDC);
-      expect(await treasury.totalDeposited()).to.equal(0n);
-    });
-
-    it("retrait partiel fonctionne", async () => {
-      await treasury.connect(owner).withdraw(ONE_USDC);
-      expect(await treasury.totalDeposited()).to.equal(HUNDRED_USDC - ONE_USDC);
-    });
-
-    it("emit l'event Withdrawn", async () => {
-      await expect(treasury.connect(owner).withdraw(HUNDRED_USDC))
-        .to.emit(treasury, "Withdrawn")
-        .withArgs(owner.address, HUNDRED_USDC);
-    });
-
-    it("ne peut pas retirer un montant nul", async () => {
-      await expect(
-        treasury.connect(owner).withdraw(0n)
-      ).to.be.revertedWithCustomError(treasury, "ZeroAmount");
-    });
-
-    it("ne peut pas retirer plus que le solde du treasury", async () => {
-      await expect(
-        treasury.connect(owner).withdraw(HUNDRED_USDC + ONE_USDC)
-      ).to.be.revertedWithCustomError(treasury, "InsufficientBalance");
-    });
-
-    it("un non-opérateur ne peut pas retirer", async () => {
-      await expect(
-        treasury.connect(alice).withdraw(HUNDRED_USDC)
-      ).to.be.revertedWithCustomError(treasury, "UnauthorizedOperator");
-    });
-  });
-
-  // ── 4. Pause ──────────────────────────────────────────────────────────────
-
-  describe("Pause", () => {
-    it("le owner peut mettre en pause", async () => {
-      await treasury.pause();
-      expect(await treasury.paused()).to.be.true;
-    });
-
-    it("le dépôt est bloqué en pause", async () => {
-      await treasury.pause();
+    it("non-opérateur ne peut pas déposer", async () => {
+      await mockUSDC.mint(alice.address, HUNDRED_USDC);
       await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC);
       await expect(
-        treasury.connect(alice).deposit(HUNDRED_USDC)
-      ).to.be.revertedWithCustomError(treasury, "EnforcedPause");
+        treasury.connect(alice).deposit(HUNDRED_USDC, await mockUSDC.getAddress())
+      ).to.be.revertedWithCustomError(treasury, "UnauthorizedOperator");
     });
 
-    it("le retrait est bloqué en pause", async () => {
-      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await treasury.connect(owner).deposit(HUNDRED_USDC);
-      await treasury.pause();
+    it("token non supporté revert UnsupportedToken", async () => {
+      const rando = await (await ethers.getContractFactory("MockUSDC")).deploy();
+      await mockUSDC.connect(operator).approve(await treasury.getAddress(), HUNDRED_USDC);
       await expect(
-        treasury.connect(alice).withdraw(HUNDRED_USDC)
-      ).to.be.revertedWithCustomError(treasury, "EnforcedPause");
-    });
-
-    it("un non-owner ne peut pas mettre en pause", async () => {
-      await expect(
-        treasury.connect(alice).pause()
-      ).to.be.revertedWithCustomError(treasury, "OwnableUnauthorizedAccount");
-    });
-
-    it("le owner peut reprendre après pause", async () => {
-      await treasury.pause();
-      await treasury.unpause();
-      expect(await treasury.paused()).to.be.false;
+        treasury.connect(operator).deposit(HUNDRED_USDC, await rando.getAddress())
+      ).to.be.revertedWithCustomError(treasury, "UnsupportedToken");
     });
   });
 
-  // ── 5. Emergency Withdraw ─────────────────────────────────────────────────
+  // ── 3. Dépôt EURC ─────────────────────────────────────────────────────────
 
-  describe("EmergencyWithdraw", () => {
+  describe("Deposit — EURC", () => {
+    it("opérateur peut déposer des EURC", async () => {
+      await treasury.connect(operator).deposit(HUNDRED_EURC, await mockEURC.getAddress());
+      expect(await treasury.totalDepositedByToken(await mockEURC.getAddress())).to.equal(HUNDRED_EURC);
+    });
+
+    it("totalDeposited agrège USDC + EURC", async () => {
+      await treasury.connect(operator).deposit(HUNDRED_USDC, await mockUSDC.getAddress());
+      await treasury.connect(operator).deposit(HUNDRED_EURC, await mockEURC.getAddress());
+      expect(await treasury.totalDeposited()).to.equal(HUNDRED_USDC + HUNDRED_EURC);
+    });
+
+    it("totalDepositedAllTokens = USDC + EURC", async () => {
+      await treasury.connect(operator).deposit(HUNDRED_USDC, await mockUSDC.getAddress());
+      await treasury.connect(operator).deposit(HUNDRED_EURC, await mockEURC.getAddress());
+      expect(await treasury.totalDepositedAllTokens()).to.equal(HUNDRED_USDC + HUNDRED_EURC);
+    });
+
+    it("totalDepositedByToken USDC et EURC sont indépendants", async () => {
+      await treasury.connect(operator).deposit(HUNDRED_USDC, await mockUSDC.getAddress());
+      await treasury.connect(operator).deposit(HUNDRED_EURC * 2n, await mockEURC.getAddress());
+      expect(await treasury.totalDepositedByToken(await mockUSDC.getAddress())).to.equal(HUNDRED_USDC);
+      expect(await treasury.totalDepositedByToken(await mockEURC.getAddress())).to.equal(HUNDRED_EURC * 2n);
+    });
+  });
+
+  // ── 4. operatorWithdraw ────────────────────────────────────────────────────
+
+  describe("operatorWithdraw — USDC et EURC", () => {
     beforeEach(async () => {
-      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await treasury.connect(owner).deposit(HUNDRED_USDC);
+      await treasury.connect(operator).deposit(THOUSAND_USDC, await mockUSDC.getAddress());
+      await treasury.connect(operator).deposit(THOUSAND_EURC, await mockEURC.getAddress());
     });
 
-    it("le owner peut faire un emergency withdraw", async () => {
-      const ownerBefore = await mockUSDC.balanceOf(owner.address);
-      await treasury.emergencyWithdraw(owner.address);
-      expect(await mockUSDC.balanceOf(owner.address)).to.equal(ownerBefore + HUNDRED_USDC);
-    });
-
-    it("emit l'event EmergencyWithdrawn", async () => {
-      await expect(treasury.emergencyWithdraw(owner.address))
-        .to.emit(treasury, "EmergencyWithdrawn")
-        .withArgs(owner.address, HUNDRED_USDC);
-    });
-
-    it("un non-owner ne peut pas faire emergency withdraw", async () => {
-      await expect(
-        treasury.connect(alice).emergencyWithdraw(alice.address)
-      ).to.be.revertedWithCustomError(treasury, "OwnableUnauthorizedAccount");
-    });
-
-    it("échoue si le treasury est vide", async () => {
-      await treasury.emergencyWithdraw(owner.address);
-      await expect(
-        treasury.emergencyWithdraw(owner.address)
-      ).to.be.revertedWithCustomError(treasury, "ZeroAmount");
-    });
-
-    it("échoue vers address(0)", async () => {
-      await expect(
-        treasury.emergencyWithdraw(ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(treasury, "ZeroAddress");
-    });
-  });
-
-  // ── 6. SetUsdcAddress ─────────────────────────────────────────────────────
-
-  describe("SetUsdcAddress", () => {
-    it("le owner peut mettre à jour l'adresse USDC", async () => {
-      const MockUSDCFactory = await ethers.getContractFactory("MockUSDC");
-      const newUsdc = await MockUSDCFactory.deploy();
-      await treasury.setUsdcAddress(await newUsdc.getAddress());
-      expect(await treasury.usdc()).to.equal(await newUsdc.getAddress());
-    });
-
-    it("emit l'event UsdcAddressUpdated", async () => {
-      const MockUSDCFactory = await ethers.getContractFactory("MockUSDC");
-      const newUsdc = await MockUSDCFactory.deploy();
-      await expect(treasury.setUsdcAddress(await newUsdc.getAddress()))
-        .to.emit(treasury, "UsdcAddressUpdated")
-        .withArgs(await mockUSDC.getAddress(), await newUsdc.getAddress());
-    });
-
-    it("un non-owner ne peut pas changer l'adresse USDC", async () => {
-      await expect(
-        treasury.connect(alice).setUsdcAddress(alice.address)
-      ).to.be.revertedWithCustomError(treasury, "OwnableUnauthorizedAccount");
-    });
-
-    it("échoue vers address(0)", async () => {
-      await expect(
-        treasury.setUsdcAddress(ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(treasury, "ZeroAddress");
-    });
-  });
-
-
-  // ── 6b. OperatorWithdraw ──────────────────────────────────────────────────
-
-  describe("OperatorWithdraw", () => {
-    beforeEach(async () => {
-      await mockUSDC.connect(owner).approve(await treasury.getAddress(), HUNDRED_USDC);
-      await treasury.connect(owner).deposit(HUNDRED_USDC);
-      await treasury.setOperator(bob.address);
-    });
-
-    it("l'opérateur peut retirer depuis le pool global", async () => {
+    it("opérateur peut retirer USDC vers alice", async () => {
       const before = await mockUSDC.balanceOf(alice.address);
-      await treasury.connect(bob).operatorWithdraw(alice.address, HUNDRED_USDC);
+      await treasury.connect(operator).operatorWithdraw(alice.address, HUNDRED_USDC, await mockUSDC.getAddress());
       expect(await mockUSDC.balanceOf(alice.address)).to.equal(before + HUNDRED_USDC);
     });
 
-    it("emit l'event OperatorWithdrawn", async () => {
-      await expect(treasury.connect(bob).operatorWithdraw(alice.address, HUNDRED_USDC))
-        .to.emit(treasury, "OperatorWithdrawn")
-        .withArgs(alice.address, HUNDRED_USDC);
+    it("opérateur peut retirer EURC vers alice", async () => {
+      const before = await mockEURC.balanceOf(alice.address);
+      await treasury.connect(operator).operatorWithdraw(alice.address, HUNDRED_EURC, await mockEURC.getAddress());
+      expect(await mockEURC.balanceOf(alice.address)).to.equal(before + HUNDRED_EURC);
     });
 
-    it("le owner peut aussi appeler operatorWithdraw", async () => {
-      await expect(
-        treasury.connect(owner).operatorWithdraw(alice.address, HUNDRED_USDC)
-      ).to.not.revert(ethers);
+    it("totalDepositedByToken décroît après retrait USDC", async () => {
+      await treasury.connect(operator).operatorWithdraw(alice.address, HUNDRED_USDC, await mockUSDC.getAddress());
+      expect(await treasury.totalDepositedByToken(await mockUSDC.getAddress())).to.equal(THOUSAND_USDC - HUNDRED_USDC);
     });
 
-    it("un non-opérateur ne peut pas appeler operatorWithdraw", async () => {
-      await expect(
-        treasury.connect(alice).operatorWithdraw(alice.address, ONE_USDC)
-      ).to.be.revertedWithCustomError(treasury, "UnauthorizedOperator");
+    it("retrait EURC n'affecte pas le solde USDC", async () => {
+      await treasury.connect(operator).operatorWithdraw(alice.address, HUNDRED_EURC, await mockEURC.getAddress());
+      expect(await treasury.totalDepositedByToken(await mockUSDC.getAddress())).to.equal(THOUSAND_USDC);
     });
 
-    it("échoue si solde Treasury insuffisant", async () => {
+    it("emit OperatorWithdrawn avec le bon token", async () => {
       await expect(
-        treasury.connect(bob).operatorWithdraw(alice.address, HUNDRED_USDC + 1n)
+        treasury.connect(operator).operatorWithdraw(alice.address, HUNDRED_USDC, await mockUSDC.getAddress())
+      ).to.emit(treasury, "OperatorWithdrawn")
+        .withArgs(await mockUSDC.getAddress(), alice.address, HUNDRED_USDC);
+    });
+
+    it("échoue si solde insuffisant USDC", async () => {
+      await expect(
+        treasury.connect(operator).operatorWithdraw(alice.address, THOUSAND_USDC * 2n, await mockUSDC.getAddress())
       ).to.be.revertedWithCustomError(treasury, "InsufficientBalance");
     });
 
-    it("échoue vers address(0)", async () => {
+    it("non-opérateur ne peut pas retirer", async () => {
       await expect(
-        treasury.connect(bob).operatorWithdraw(ethers.ZeroAddress, ONE_USDC)
-      ).to.be.revertedWithCustomError(treasury, "ZeroAddress");
+        treasury.connect(alice).operatorWithdraw(alice.address, HUNDRED_USDC, await mockUSDC.getAddress())
+      ).to.be.revertedWithCustomError(treasury, "UnauthorizedOperator");
+    });
+  });
+
+  // ── 5. injectCapital ───────────────────────────────────────────────────────
+
+  describe("injectCapital", () => {
+    beforeEach(async () => {
+      await mockUSDC.mint(owner.address, THOUSAND_USDC);
+      await mockUSDC.connect(owner).approve(await treasury.getAddress(), THOUSAND_USDC);
+      await mockEURC.mint(owner.address, THOUSAND_EURC);
+      await mockEURC.connect(owner).approve(await treasury.getAddress(), THOUSAND_EURC);
     });
 
-    it("setOperator émet l'event OperatorUpdated", async () => {
-      await expect(treasury.setOperator(alice.address))
-        .to.emit(treasury, "OperatorUpdated")
-        .withArgs(bob.address, alice.address);
+    it("owner peut injecter USDC", async () => {
+      await treasury.connect(owner).injectCapital(HUNDRED_USDC, await mockUSDC.getAddress());
+      expect(await treasury.totalDepositedByToken(await mockUSDC.getAddress())).to.equal(HUNDRED_USDC);
     });
 
-    it("un non-owner ne peut pas changer l'opérateur", async () => {
+    it("owner peut injecter EURC", async () => {
+      await treasury.connect(owner).injectCapital(HUNDRED_EURC, await mockEURC.getAddress());
+      expect(await treasury.totalDepositedByToken(await mockEURC.getAddress())).to.equal(HUNDRED_EURC);
+    });
+
+    it("non-autorisé ne peut pas injecter", async () => {
+      await mockUSDC.mint(alice.address, HUNDRED_USDC);
+      await mockUSDC.connect(alice).approve(await treasury.getAddress(), HUNDRED_USDC);
       await expect(
-        treasury.connect(alice).setOperator(alice.address)
+        treasury.connect(alice).injectCapital(HUNDRED_USDC, await mockUSDC.getAddress())
+      ).to.be.revertedWithCustomError(treasury, "UnauthorizedOperator");
+    });
+  });
+
+  // ── 6. Gestion des tokens supportés ───────────────────────────────────────
+
+  describe("Gestion tokens supportés", () => {
+    it("addSupportedToken ajoute un token", async () => {
+      const newToken = await (await ethers.getContractFactory("MockUSDC")).deploy();
+      await treasury.connect(owner).addSupportedToken(await newToken.getAddress());
+      expect(await treasury.isSupportedToken(await newToken.getAddress())).to.be.true;
+    });
+
+    it("addSupportedToken émet TokenAdded", async () => {
+      const newToken = await (await ethers.getContractFactory("MockUSDC")).deploy();
+      await expect(treasury.connect(owner).addSupportedToken(await newToken.getAddress()))
+        .to.emit(treasury, "TokenAdded")
+        .withArgs(await newToken.getAddress());
+    });
+
+    it("removeSupportedToken retire un token", async () => {
+      await treasury.connect(owner).removeSupportedToken(await mockEURC.getAddress());
+      expect(await treasury.isSupportedToken(await mockEURC.getAddress())).to.be.false;
+    });
+
+    it("non-owner ne peut pas addSupportedToken", async () => {
+      const newToken = await (await ethers.getContractFactory("MockUSDC")).deploy();
+      await expect(
+        treasury.connect(alice).addSupportedToken(await newToken.getAddress())
+      ).to.be.revertedWithCustomError(treasury, "OwnableUnauthorizedAccount");
+    });
+
+    it("setEurc configure l'adresse EURC et l'ajoute aux tokens supportés", async () => {
+      const newEurc = await (await ethers.getContractFactory("MockUSDC")).deploy();
+      await treasury.connect(owner).setEurc(await newEurc.getAddress());
+      expect(await treasury.isSupportedToken(await newEurc.getAddress())).to.be.true;
+    });
+  });
+
+  // ── 7. Pause ──────────────────────────────────────────────────────────────
+
+  describe("Pause", () => {
+    it("dépôt bloqué en pause", async () => {
+      await treasury.connect(owner).pause();
+      await expect(
+        treasury.connect(operator).deposit(HUNDRED_USDC, await mockUSDC.getAddress())
+      ).to.be.revertedWithCustomError(treasury, "EnforcedPause");
+    });
+
+    it("retrait bloqué en pause", async () => {
+      await treasury.connect(operator).deposit(HUNDRED_USDC, await mockUSDC.getAddress());
+      await treasury.connect(owner).pause();
+      await expect(
+        treasury.connect(operator).operatorWithdraw(alice.address, HUNDRED_USDC, await mockUSDC.getAddress())
+      ).to.be.revertedWithCustomError(treasury, "EnforcedPause");
+    });
+  });
+
+  // ── 8. emergencyWithdraw ──────────────────────────────────────────────────
+
+  describe("emergencyWithdraw", () => {
+    it("owner peut faire un emergency withdraw USDC", async () => {
+      await treasury.connect(operator).deposit(HUNDRED_USDC, await mockUSDC.getAddress());
+      const before = await mockUSDC.balanceOf(owner.address);
+      await treasury.connect(owner).emergencyWithdraw(owner.address, await mockUSDC.getAddress());
+      expect(await mockUSDC.balanceOf(owner.address)).to.equal(before + HUNDRED_USDC);
+    });
+
+    it("owner peut faire un emergency withdraw EURC", async () => {
+      await treasury.connect(operator).deposit(HUNDRED_EURC, await mockEURC.getAddress());
+      const before = await mockEURC.balanceOf(owner.address);
+      await treasury.connect(owner).emergencyWithdraw(owner.address, await mockEURC.getAddress());
+      expect(await mockEURC.balanceOf(owner.address)).to.equal(before + HUNDRED_EURC);
+    });
+
+    it("non-owner ne peut pas faire emergency withdraw", async () => {
+      await expect(
+        treasury.connect(alice).emergencyWithdraw(alice.address, await mockUSDC.getAddress())
       ).to.be.revertedWithCustomError(treasury, "OwnableUnauthorizedAccount");
     });
   });
 
-  // ── 7. UUPS Upgradeability ────────────────────────────────────────────────
+  // ── 9. UUPS ───────────────────────────────────────────────────────────────
 
   describe("Upgradeability (UUPS)", () => {
-    it("le owner peut upgrader l'implémentation", async () => {
-      const TreasuryFactory = await ethers.getContractFactory("Treasury");
-      const newImpl = await TreasuryFactory.deploy();
-      await expect(
-        treasury.upgradeToAndCall(await newImpl.getAddress(), "0x")
-      ).to.not.revert(ethers);
+    it("owner peut upgrader", async () => {
+      const newImpl = await (await ethers.getContractFactory("contracts/Treasury.sol:Treasury")).deploy();
+      await expect(treasury.upgradeToAndCall(await newImpl.getAddress(), "0x"))
+        .to.not.revert(ethers);
     });
 
-    it("un non-owner ne peut pas upgrader", async () => {
-      const TreasuryFactory = await ethers.getContractFactory("Treasury");
-      const newImpl = await TreasuryFactory.deploy();
-      await expect(
-        treasury.connect(alice).upgradeToAndCall(await newImpl.getAddress(), "0x")
-      ).to.be.revertedWithCustomError(treasury, "OwnableUnauthorizedAccount");
+    it("non-owner ne peut pas upgrader", async () => {
+      const newImpl = await (await ethers.getContractFactory("contracts/Treasury.sol:Treasury")).deploy();
+      await expect(treasury.connect(alice).upgradeToAndCall(await newImpl.getAddress(), "0x"))
+        .to.be.revertedWithCustomError(treasury, "OwnableUnauthorizedAccount");
     });
   });
 });

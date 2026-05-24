@@ -125,7 +125,7 @@ export default function ReservePage() {
 
       // 2. Recapitalize
       const tx = await writeContractAsync({
-        ...reserve, functionName: "recapitalize", args: [parsed],
+        ...reserve, functionName: "recapitalize", args: [parsed, usdcAddress as `0x${string}`],
       });
       setTxHash(tx);
       setRecapAmount("");
@@ -278,6 +278,7 @@ export default function ReservePage() {
             <Input type="number" placeholder="Montant USDC" value={recapAmount}
               onChange={e => setRecapAmount(e.target.value)} className="pr-16" min="0" />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">USDC</span>
+            {/* V3: pour recapitaliser en EURC, utiliser usdcAddress → eurcAddress */}
           </div>
           {deficitUsdc !== undefined && deficitUsdc > 0n && (
             <Button variant="ghost" size="sm" className="text-xs text-primary p-0 h-auto"

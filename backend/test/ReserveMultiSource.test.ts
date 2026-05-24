@@ -73,7 +73,7 @@ describe("Oracle multi-sources — Étape 7 : Chainlink + Tellor (Reserve)", () 
     const treasuryProxy  = await ProxyFactory.deploy(
       await treasuryImpl.getAddress(),
       treasuryImpl.interface.encodeFunctionData("initialize", [
-        owner.address, await mockUSDC.getAddress(),
+        owner.address, await mockUSDC.getAddress(), ethers.ZeroAddress,
       ])
     );
     treasury = await ethers.getContractAt("Treasury", await treasuryProxy.getAddress());
@@ -122,7 +122,7 @@ describe("Oracle multi-sources — Étape 7 : Chainlink + Tellor (Reserve)", () 
 
   async function aliceBuys(usdcAmount: bigint) {
     await mockUSDC.connect(alice).approve(await exchange.getAddress(), usdcAmount);
-    await exchange.connect(alice).buy(usdcAmount);
+    await exchange.connect(alice).buy(usdcAmount, await mockUSDC.getAddress());
   }
 
   // ── 1. Configuration ──────────────────────────────────────────────────────

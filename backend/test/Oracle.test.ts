@@ -54,7 +54,7 @@ describe("Oracle — Étape 5 : Chainlink + fallback", () => {
     const treasuryProxy = await ProxyFactory.deploy(
       await treasuryImpl.getAddress(),
       treasuryImpl.interface.encodeFunctionData("initialize", [
-        owner.address, await mockUSDC.getAddress(),
+        owner.address, await mockUSDC.getAddress(), ethers.ZeroAddress,
       ])
     );
     treasury = await ethers.getContractAt("Treasury", await treasuryProxy.getAddress());
@@ -79,7 +79,7 @@ describe("Oracle — Étape 5 : Chainlink + fallback", () => {
     await mockUSDC.mint(alice.address, THOUSAND_USDC);
     await mockUSDC.mint(owner.address, THOUSAND_USDC * 10n);
     await mockUSDC.connect(owner).approve(await treasury.getAddress(), THOUSAND_USDC * 10n);
-    await treasury.connect(owner).deposit(THOUSAND_USDC * 10n);
+    await treasury.connect(owner).deposit(THOUSAND_USDC * 10n, await mockUSDC.getAddress());
   });
 
   // ── 1. Lecture du prix oracle ──────────────────────────────────────────────
@@ -97,21 +97,21 @@ describe("Oracle — Étape 5 : Chainlink + fallback", () => {
     });
 
     it("le prix oracle est pris en compte dans previewBuy", async () => {
-      const gldAmount = await exchange.previewBuy(HUNDRED_USDC);
+      const gldAmount = await exchange.previewBuy(HUNDRED_USDC, await mockUSDC.getAddress());
       expect(gldAmount).to.equal(1111n);
     });
 
     it("previewBuy change si le prix oracle change", async () => {
-      const before = await exchange.previewBuy(HUNDRED_USDC);
+      const before = await exchange.previewBuy(HUNDRED_USDC, await mockUSDC.getAddress());
       await oracle.setPrice(PRICE_100);
-      const after = await exchange.previewBuy(HUNDRED_USDC);
+      const after = await exchange.previewBuy(HUNDRED_USDC, await mockUSDC.getAddress());
       expect(after).to.be.lt(before);
     });
 
     it("previewSell change si le prix oracle change", async () => {
-      const before = await exchange.previewSell(1000n);
+      const before = await exchange.previewSell(1000n, await mockUSDC.getAddress());
       await oracle.setPrice(PRICE_100);
-      const after = await exchange.previewSell(1000n);
+      const after = await exchange.previewSell(1000n, await mockUSDC.getAddress());
       expect(after).to.be.gt(before);
     });
   });
@@ -230,14 +230,14 @@ describe("Oracle — Étape 5 : Chainlink + fallback", () => {
     it("achat au prix oracle $90 — GLD correct", async () => {
       await oracle.setPrice(PRICE_90);
       await mockUSDC.connect(alice).approve(await exchange.getAddress(), HUNDRED_USDC);
-      await exchange.connect(alice).buy(HUNDRED_USDC);
+      await exchange.connect(alice).buy(HUNDRED_USDC, await mockUSDC.getAddress());
       expect(await gld.balanceOf(alice.address)).to.equal(1111n);
     });
 
     it("achat au prix oracle $100 — moins de GLD", async () => {
       await oracle.setPrice(PRICE_100);
       await mockUSDC.connect(alice).approve(await exchange.getAddress(), HUNDRED_USDC);
-      await exchange.connect(alice).buy(HUNDRED_USDC);
+      await exchange.connect(alice).buy(HUNDRED_USDC, await mockUSDC.getAddress());
       expect(await gld.balanceOf(alice.address)).to.equal(1000n);
     });
 
@@ -245,24 +245,24 @@ describe("Oracle — Étape 5 : Chainlink + fallback", () => {
       const ts = BigInt(Math.floor(Date.now() / 1000)) - TWO_HOURS;
       await oracle.setUpdatedAt(ts);
       await mockUSDC.connect(alice).approve(await exchange.getAddress(), HUNDRED_USDC);
-      await exchange.connect(alice).buy(HUNDRED_USDC);
+      await exchange.connect(alice).buy(HUNDRED_USDC, await mockUSDC.getAddress());
       expect(await gld.balanceOf(alice.address)).to.equal(1111n);
     });
 
     it("l'event TokensBought contient le bon prix (oracle)", async () => {
       await oracle.setPrice(PRICE_100);
       await mockUSDC.connect(alice).approve(await exchange.getAddress(), HUNDRED_USDC);
-      await expect(exchange.connect(alice).buy(HUNDRED_USDC))
+      await expect(exchange.connect(alice).buy(HUNDRED_USDC, await mockUSDC.getAddress()))
         .to.emit(exchange, "TokensBought")
-        .withArgs(alice.address, HUNDRED_USDC, 1000n, PRICE_100);
+        .withArgs(alice.address, await mockUSDC.getAddress(), HUNDRED_USDC, 1000n, PRICE_100);
     });
 
     it("l'event TokensBought contient le prix fallback si oracle KO", async () => {
       await oracle.setShouldRevert(true);
       await mockUSDC.connect(alice).approve(await exchange.getAddress(), HUNDRED_USDC);
-      await expect(exchange.connect(alice).buy(HUNDRED_USDC))
+      await expect(exchange.connect(alice).buy(HUNDRED_USDC, await mockUSDC.getAddress()))
         .to.emit(exchange, "TokensBought")
-        .withArgs(alice.address, HUNDRED_USDC, 1111n, FALLBACK_PRICE);
+        .withArgs(alice.address, await mockUSDC.getAddress(), HUNDRED_USDC, 1111n, FALLBACK_PRICE);
     });
   });
 
@@ -272,21 +272,21 @@ describe("Oracle — Étape 5 : Chainlink + fallback", () => {
     beforeEach(async () => {
       await oracle.setPrice(PRICE_90);
       await mockUSDC.connect(alice).approve(await exchange.getAddress(), HUNDRED_USDC);
-      await exchange.connect(alice).buy(HUNDRED_USDC);
+      await exchange.connect(alice).buy(HUNDRED_USDC, await mockUSDC.getAddress());
     });
 
     it("vente au même prix — récupère l'USDC equivalent", async () => {
       const gldBalance   = await gld.balanceOf(alice.address);
-      const usdcExpected = await exchange.previewSell(gldBalance);
+      const usdcExpected = await exchange.previewSell(gldBalance, await mockUSDC.getAddress());
       const usdcBefore   = await mockUSDC.balanceOf(alice.address);
-      await exchange.connect(alice).sell(gldBalance);
+      await exchange.connect(alice).sell(gldBalance, await mockUSDC.getAddress());
       expect(await mockUSDC.balanceOf(alice.address)).to.equal(usdcBefore + usdcExpected);
     });
 
     it("vente à prix plus élevé (+20%) — plus d'USDC récupérés", async () => {
       const gldBalance = await gld.balanceOf(alice.address);
       await oracle.setPrice(PRICE_108);
-      const usdcAtHighPrice = await exchange.previewSell(gldBalance);
+      const usdcAtHighPrice = await exchange.previewSell(gldBalance, await mockUSDC.getAddress());
       const usdcAtLowPrice  = (gldBalance * PRICE_90) / 100_000n;
       expect(usdcAtHighPrice).to.be.gt(usdcAtLowPrice);
     });
@@ -294,10 +294,10 @@ describe("Oracle — Étape 5 : Chainlink + fallback", () => {
     it("l'event TokensSold contient le bon prix oracle", async () => {
       const gldBalance = await gld.balanceOf(alice.address);
       await oracle.setPrice(PRICE_100);
-      const usdcExpected = await exchange.previewSell(gldBalance);
-      await expect(exchange.connect(alice).sell(gldBalance))
+      const usdcExpected = await exchange.previewSell(gldBalance, await mockUSDC.getAddress());
+      await expect(exchange.connect(alice).sell(gldBalance, await mockUSDC.getAddress()))
         .to.emit(exchange, "TokensSold")
-        .withArgs(alice.address, gldBalance, usdcExpected, PRICE_100);
+        .withArgs(alice.address, await mockUSDC.getAddress(), gldBalance, usdcExpected, PRICE_100);
     });
   });
 
@@ -307,23 +307,23 @@ describe("Oracle — Étape 5 : Chainlink + fallback", () => {
     it("achat à $90 puis vente à $108 — plus-value correcte", async () => {
       await oracle.setPrice(PRICE_90);
       await mockUSDC.connect(alice).approve(await exchange.getAddress(), HUNDRED_USDC);
-      await exchange.connect(alice).buy(HUNDRED_USDC);
+      await exchange.connect(alice).buy(HUNDRED_USDC, await mockUSDC.getAddress());
 
       const gldBalance = await gld.balanceOf(alice.address);
       const usdcBefore = await mockUSDC.balanceOf(alice.address);
 
       await oracle.setPrice(PRICE_108);
 
-      const usdcNeeded      = await exchange.previewSell(gldBalance);
+      const usdcNeeded      = await exchange.previewSell(gldBalance, await mockUSDC.getAddress());
       const treasuryBalance = await mockUSDC.balanceOf(await treasury.getAddress());
       if (usdcNeeded > treasuryBalance) {
         const extra = usdcNeeded - treasuryBalance;
         await mockUSDC.mint(owner.address, extra);
         await mockUSDC.connect(owner).approve(await treasury.getAddress(), extra);
-        await treasury.connect(owner).deposit(extra);
+        await treasury.connect(owner).deposit(extra, await mockUSDC.getAddress());
       }
 
-      await exchange.connect(alice).sell(gldBalance);
+      await exchange.connect(alice).sell(gldBalance, await mockUSDC.getAddress());
       const usdcAfter = await mockUSDC.balanceOf(alice.address);
       expect(usdcAfter).to.be.gt(usdcBefore + HUNDRED_USDC);
     });
