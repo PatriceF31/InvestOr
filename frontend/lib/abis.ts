@@ -4623,6 +4623,7 @@ export const EventLoggerABI = [
 ] as const;
 
 // ── LingotOr ──────────────────────────────────────────────
+// ── LingotOr ──────────────────────────────────────────────
 export const LingotOrABI = [
   {
     "inputs": [],
@@ -5472,12 +5473,38 @@ export const LingotOrABI = [
   {
     "inputs": [
       {
+        "internalType": "uint256[]",
+        "name": "proposalIds",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "approveBurnBatch",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "proposalId",
         "type": "uint256"
       }
     ],
     "name": "approveMint",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "proposalIds",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "approveMintBatch",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -6028,6 +6055,52 @@ export const LingotOrABI = [
   {
     "inputs": [
       {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "from",
+            "type": "address"
+          },
+          {
+            "internalType": "string",
+            "name": "serialCode",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct LingotOr.BurnProposalInput[]",
+        "name": "inputs",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
+      }
+    ],
+    "name": "proposeBurnBatch",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "proposalIds",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "tokenId",
         "type": "uint256"
@@ -6069,6 +6142,62 @@ export const LingotOrABI = [
         "internalType": "uint256",
         "name": "proposalId",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "to",
+            "type": "address"
+          },
+          {
+            "internalType": "string",
+            "name": "serialCode",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct LingotOr.MintProposalInput[]",
+        "name": "inputs",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "string",
+        "name": "refiner",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "supplier",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "origin",
+        "type": "string"
+      }
+    ],
+    "name": "proposeMintBatch",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "proposalIds",
+        "type": "uint256[]"
       }
     ],
     "stateMutability": "nonpayable",
@@ -6419,5 +6548,4 @@ export const LingotOrABI = [
     "stateMutability": "view",
     "type": "function"
   }
-
 ] as const;
