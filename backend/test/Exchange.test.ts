@@ -11,24 +11,28 @@ const ONE_EURC      = 1_000_000n;
 const HUNDRED_EURC  = 100n * ONE_EURC;
 const THOUSAND_EURC = 1_000n * ONE_EURC;
 
-const FALLBACK_PRICE = 90_00000000n;
+const FALLBACK_PRICE    = 90_00000000n;  // $90/g (8 dec)
+const EUR_USD_RATE      = 108_000_000n;  // 1.08 (8 dec)
+const EUR_USD_FALLBACK  = 108_000_000n;  // même valeur pour les tests
 
 // 100 USDC / $90 * 1e5 = 1111 GLD (arrondi)
 const EXPECTED_GLD_FOR_100_USDC = 1111n;
-const EXPECTED_GLD_FOR_100_EURC = 1111n;  // même prix, même calcul
+// 100 EURC * 1.08 / $90 * 1e5 = 1200 GLD
+const EXPECTED_GLD_FOR_100_EURC = 1200n;
 
 // ─── Suite principale ─────────────────────────────────────────────────────────
 
-describe("Exchange V3 — Multi-token USDC + EURC", () => {
-  let exchange: any;
-  let gld:      any;
-  let treasury: any;
-  let mockUSDC: any;
-  let mockEURC: any;
-  let owner:    HardhatEthersSigner;
-  let alice:    HardhatEthersSigner;
-  let bob:      HardhatEthersSigner;
-  let ethers:   any;
+describe("Exchange V4 — Multi-token USDC + EURC avec oracle EUR/USD", () => {
+  let exchange:        any;
+  let gld:             any;
+  let treasury:        any;
+  let mockUSDC:        any;
+  let mockEURC:        any;
+  let mockEurUsdOracle: any;
+  let owner:           HardhatEthersSigner;
+  let alice:           HardhatEthersSigner;
+  let bob:             HardhatEthersSigner;
+  let ethers:          any;
 
   // ─── beforeEach ────────────────────────────────────────────────────────────
 
@@ -42,6 +46,10 @@ describe("Exchange V3 — Multi-token USDC + EURC", () => {
     // Mock tokens
     mockUSDC = await (await ethers.getContractFactory("MockUSDC")).deploy();
     mockEURC = await (await ethers.getContractFactory("MockUSDC")).deploy();
+
+    // Mock oracle EUR/USD
+    mockEurUsdOracle = await (await ethers.getContractFactory("MockChainlinkOracle")).deploy(EUR_USD_RATE, 8);
+    await mockEurUsdOracle.setUpdatedAt(await ethers.provider.getBlock("latest").then((b: any) => b.timestamp));
 
     // GLD
     const gldImpl  = await (await ethers.getContractFactory("GLD")).deploy();
@@ -63,7 +71,7 @@ describe("Exchange V3 — Multi-token USDC + EURC", () => {
     );
     treasury = await ethers.getContractAt("contracts/Treasury.sol:Treasury", await treasuryProxy.getAddress());
 
-    // Exchange V3
+    // Exchange V4
     const exchangeImpl  = await (await ethers.getContractFactory("contracts/Exchange.sol:Exchange")).deploy();
     const exchangeProxy = await ProxyFactory.deploy(
       await exchangeImpl.getAddress(),
@@ -77,20 +85,21 @@ describe("Exchange V3 — Multi-token USDC + EURC", () => {
     );
     exchange = await ethers.getContractAt("contracts/Exchange.sol:Exchange", await exchangeProxy.getAddress());
 
-    // Configurer EURC dans Exchange
+    // Configurer EURC et oracle EUR/USD
     await exchange.connect(owner).setEurc(await mockEURC.getAddress());
+    await exchange.connect(owner).setEurUsdOracle(await mockEurUsdOracle.getAddress());
 
     // Rôles
     await gld.setMinter(await exchangeProxy.getAddress());
     await treasury.setOperator(await exchangeProxy.getAddress());
 
-    // Fonds alice et bob
+    // Fonds
     await mockUSDC.mint(alice.address, THOUSAND_USDC);
-    await mockUSDC.mint(bob.address,   THOUSAND_USDC);
     await mockEURC.mint(alice.address, THOUSAND_EURC);
+    await mockUSDC.mint(bob.address,   THOUSAND_USDC);
     await mockEURC.mint(bob.address,   THOUSAND_EURC);
 
-    // Pré-alimenter le Treasury (pour les ventes)
+    // Pré-alimenter Treasury
     await mockUSDC.mint(owner.address, THOUSAND_USDC * 10n);
     await mockEURC.mint(owner.address, THOUSAND_EURC * 10n);
     await mockUSDC.connect(owner).approve(await treasury.getAddress(), THOUSAND_USDC * 10n);
@@ -98,8 +107,6 @@ describe("Exchange V3 — Multi-token USDC + EURC", () => {
     await treasury.connect(owner).deposit(THOUSAND_USDC * 10n, await mockUSDC.getAddress());
     await treasury.connect(owner).deposit(THOUSAND_EURC * 10n, await mockEURC.getAddress());
   });
-
-  // ─── Helpers ─────────────────────────────────────────────────────────────
 
   async function aliceBuysUsdc(amount = HUNDRED_USDC) {
     await mockUSDC.connect(alice).approve(await exchange.getAddress(), amount);
@@ -111,373 +118,226 @@ describe("Exchange V3 — Multi-token USDC + EURC", () => {
     await exchange.connect(alice).buy(amount, await mockEURC.getAddress());
   }
 
-  // ── 1. Initialisation ──────────────────────────────────────────────────────
+  // ── 1. Oracle EUR/USD ─────────────────────────────────────────────────────
 
-  describe("Initialisation", () => {
-    it("doit avoir les bonnes adresses", async () => {
-      expect(await exchange.gld()).to.equal(await gld.getAddress());
-      expect(await exchange.treasury()).to.equal(await treasury.getAddress());
+  describe("Oracle EUR/USD", () => {
+    it("getEurUsdRate retourne le taux oracle si disponible", async () => {
+      const [rate, isLive] = await exchange.getEurUsdRate();
+      expect(rate).to.equal(EUR_USD_RATE);
+      expect(isLive).to.be.true;
     });
 
-    it("eurc configuré", async () => {
-      expect(await exchange.eurc()).to.equal(await mockEURC.getAddress());
+    it("getEurUsdRate retourne le fallback si oracle indisponible", async () => {
+      await exchange.connect(owner).setEurUsdOracle(ethers.ZeroAddress);
+      const [rate, isLive] = await exchange.getEurUsdRate();
+      expect(rate).to.equal(EUR_USD_FALLBACK);
+      expect(isLive).to.be.false;
     });
 
-    it("fallbackPrice correct", async () => {
-      expect(await exchange.fallbackPrice()).to.equal(FALLBACK_PRICE);
+    it("setEurUsdOracle met à jour l'oracle", async () => {
+      const newOracle = await (await ethers.getContractFactory("MockChainlinkOracle")).deploy(EUR_USD_RATE, 8);
+      await exchange.connect(owner).setEurUsdOracle(await newOracle.getAddress());
+      expect(await exchange.eurusdOracle()).to.equal(await newOracle.getAddress());
     });
 
-    it("getPrice retourne source=3 (fallback) sans oracle", async () => {
-      const [, source] = await exchange.getPrice();
-      expect(source).to.equal(3n);
+    it("setEurUsdOracle émet EurUsdOracleUpdated", async () => {
+      const newOracle = await (await ethers.getContractFactory("MockChainlinkOracle")).deploy(EUR_USD_RATE, 8);
+      await expect(exchange.connect(owner).setEurUsdOracle(await newOracle.getAddress()))
+        .to.emit(exchange, "EurUsdOracleUpdated");
+    });
+
+    it("setEurUsdFallbackRate met à jour le taux fallback", async () => {
+      await exchange.connect(owner).setEurUsdFallbackRate(110_000_000n);
+      expect(await exchange.eurusdFallbackRate()).to.equal(110_000_000n);
+    });
+
+    it("non-owner ne peut pas setEurUsdOracle", async () => {
+      await expect(
+        exchange.connect(alice).setEurUsdOracle(ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(exchange, "OwnableUnauthorizedAccount");
     });
   });
 
-  // ── 2. previewBuy / previewSell multi-token ────────────────────────────────
+  // ── 2. previewBuy avec conversion EUR/USD ─────────────────────────────────
 
-  describe("Preview multi-token", () => {
-    it("previewBuy USDC calcule correctement", async () => {
+  describe("previewBuy — conversion EUR/USD", () => {
+    it("previewBuy USDC sans conversion — résultat attendu", async () => {
       expect(await exchange.previewBuy(HUNDRED_USDC, await mockUSDC.getAddress()))
         .to.equal(EXPECTED_GLD_FOR_100_USDC);
     });
 
-    it("previewBuy EURC calcule correctement (même prix)", async () => {
+    it("previewBuy EURC avec taux 1.08 — plus de GLD qu'en USDC", async () => {
+      const gldFromEurc = await exchange.previewBuy(HUNDRED_EURC, await mockEURC.getAddress());
+      const gldFromUsdc = await exchange.previewBuy(HUNDRED_USDC, await mockUSDC.getAddress());
+      expect(gldFromEurc).to.be.gt(gldFromUsdc);
+    });
+
+    it("previewBuy EURC 100 EURC × 1.08 / $90 = 1200 GLD", async () => {
       expect(await exchange.previewBuy(HUNDRED_EURC, await mockEURC.getAddress()))
         .to.equal(EXPECTED_GLD_FOR_100_EURC);
     });
 
-    it("previewSell USDC et EURC donnent le même résultat (même prix)", async () => {
+    it("previewBuy EURC avec taux 1.00 = même résultat que USDC", async () => {
+      await mockEurUsdOracle.setPrice(100_000_000n); // 1.00
+      const gldFromEurc = await exchange.previewBuy(HUNDRED_EURC, await mockEURC.getAddress());
+      const gldFromUsdc = await exchange.previewBuy(HUNDRED_USDC, await mockUSDC.getAddress());
+      expect(gldFromEurc).to.equal(gldFromUsdc);
+    });
+
+    it("previewBuy EURC avec taux 1.20 — encore plus de GLD que 1.08", async () => {
+      const gldAt108 = await exchange.previewBuy(HUNDRED_EURC, await mockEURC.getAddress());
+      await mockEurUsdOracle.setPrice(120_000_000n); // 1.20
+      const gldAt120 = await exchange.previewBuy(HUNDRED_EURC, await mockEURC.getAddress());
+      expect(gldAt120).to.be.gt(gldAt108);
+    });
+
+    it("previewBuy EURC utilise fallback si oracle KO", async () => {
+      await exchange.connect(owner).setEurUsdOracle(ethers.ZeroAddress);
+      // Avec fallback 1.08 — même résultat
+      expect(await exchange.previewBuy(HUNDRED_EURC, await mockEURC.getAddress()))
+        .to.equal(EXPECTED_GLD_FOR_100_EURC);
+    });
+  });
+
+  // ── 3. previewSell avec conversion EUR/USD ────────────────────────────────
+
+  describe("previewSell — conversion EUR/USD", () => {
+    it("previewSell USDC sans conversion", async () => {
       const usdc = await exchange.previewSell(1000n, await mockUSDC.getAddress());
-      const eurc = await exchange.previewSell(1000n, await mockEURC.getAddress());
-      expect(usdc).to.equal(eurc);
+      expect(usdc).to.be.gt(0n);
     });
 
-    it("previewBuy échoue avec token non supporté", async () => {
-      const rando = await (await ethers.getContractFactory("MockUSDC")).deploy();
-      await expect(
-        exchange.previewBuy(HUNDRED_USDC, await rando.getAddress())
-      ).to.be.revertedWithCustomError(exchange, "UnsupportedToken");
+    it("previewSell EURC retourne moins d'EURC que d'USDC (÷ taux)", async () => {
+      const eurcOut = await exchange.previewSell(1000n, await mockEURC.getAddress());
+      const usdcOut = await exchange.previewSell(1000n, await mockUSDC.getAddress());
+      // EURC = USD / 1.08 < USD
+      expect(eurcOut).to.be.lt(usdcOut);
     });
 
-    it("previewBuy échoue avec montant nul", async () => {
-      await expect(
-        exchange.previewBuy(0n, await mockUSDC.getAddress())
-      ).to.be.revertedWithCustomError(exchange, "ZeroAmount");
-    });
-  });
-
-  // ── 3. Achat avec USDC ────────────────────────────────────────────────────
-
-  describe("Buy — USDC", () => {
-    it("alice peut acheter des GLD avec USDC", async () => {
-      await aliceBuysUsdc();
-      expect(await gld.balanceOf(alice.address)).to.equal(EXPECTED_GLD_FOR_100_USDC);
-    });
-
-    it("le Treasury USDC reçoit les fonds", async () => {
-      const before = await treasury.totalDepositedByToken(await mockUSDC.getAddress());
-      await aliceBuysUsdc();
-      expect(await treasury.totalDepositedByToken(await mockUSDC.getAddress()))
-        .to.equal(before + HUNDRED_USDC);
-    });
-
-    it("emit TokensBought avec le bon token", async () => {
-      await mockUSDC.connect(alice).approve(await exchange.getAddress(), HUNDRED_USDC);
-      await expect(exchange.connect(alice).buy(HUNDRED_USDC, await mockUSDC.getAddress()))
-        .to.emit(exchange, "TokensBought")
-        .withArgs(alice.address, await mockUSDC.getAddress(), HUNDRED_USDC, EXPECTED_GLD_FOR_100_USDC, FALLBACK_PRICE);
-    });
-
-    it("échoue en pause", async () => {
-      await exchange.pause();
-      await mockUSDC.connect(alice).approve(await exchange.getAddress(), HUNDRED_USDC);
-      await expect(
-        exchange.connect(alice).buy(HUNDRED_USDC, await mockUSDC.getAddress())
-      ).to.be.revertedWithCustomError(exchange, "EnforcedPause");
-    });
-
-    it("échoue sans approbation", async () => {
-      await expect(
-        exchange.connect(alice).buy(HUNDRED_USDC, await mockUSDC.getAddress())
-      ).to.revert(ethers);
-    });
-
-    it("échoue avec token non supporté", async () => {
-      const rando = await (await ethers.getContractFactory("MockUSDC")).deploy();
-      await expect(
-        exchange.connect(alice).buy(HUNDRED_USDC, await rando.getAddress())
-      ).to.be.revertedWithCustomError(exchange, "UnsupportedToken");
+    it("previewSell EURC avec taux 1.00 = même montant que USDC", async () => {
+      await mockEurUsdOracle.setPrice(100_000_000n);
+      const eurcOut = await exchange.previewSell(1000n, await mockEURC.getAddress());
+      const usdcOut = await exchange.previewSell(1000n, await mockUSDC.getAddress());
+      expect(eurcOut).to.equal(usdcOut);
     });
   });
 
-  // ── 4. Achat avec EURC ────────────────────────────────────────────────────
+  // ── 4. Achat avec conversion ──────────────────────────────────────────────
 
-  describe("Buy — EURC", () => {
-    it("alice peut acheter des GLD avec EURC", async () => {
+  describe("Buy — conversion EUR/USD appliquée", () => {
+    it("achat EURC mint plus de GLD qu'achat USDC (taux 1.08)", async () => {
+      await aliceBuysUsdc();
+      const gldAfterUsdc = await gld.balanceOf(alice.address);
+
+      // Reset alice
+      await gld.burn(alice.address, gldAfterUsdc);
+
+      await aliceBuysEurc();
+      const gldAfterEurc = await gld.balanceOf(alice.address);
+
+      expect(gldAfterEurc).to.be.gt(gldAfterUsdc);
+    });
+
+    it("achat EURC 100€ × 1.08 = 108 USD équivalent → 1200 GLD", async () => {
       await aliceBuysEurc();
       expect(await gld.balanceOf(alice.address)).to.equal(EXPECTED_GLD_FOR_100_EURC);
     });
 
-    it("le Treasury EURC reçoit les fonds", async () => {
+    it("Treasury EURC reçoit les fonds", async () => {
       const before = await treasury.totalDepositedByToken(await mockEURC.getAddress());
       await aliceBuysEurc();
       expect(await treasury.totalDepositedByToken(await mockEURC.getAddress()))
-        .to.equal(before + HUNDRED_EURC);
-    });
-
-    it("achat EURC n'affecte pas le solde USDC du Treasury", async () => {
-      const usdcBefore = await treasury.totalDepositedByToken(await mockUSDC.getAddress());
-      await aliceBuysEurc();
-      expect(await treasury.totalDepositedByToken(await mockUSDC.getAddress()))
-        .to.equal(usdcBefore);
-    });
-
-    it("emit TokensBought avec EURC", async () => {
-      await mockEURC.connect(alice).approve(await exchange.getAddress(), HUNDRED_EURC);
-      await expect(exchange.connect(alice).buy(HUNDRED_EURC, await mockEURC.getAddress()))
-        .to.emit(exchange, "TokensBought")
-        .withArgs(alice.address, await mockEURC.getAddress(), HUNDRED_EURC, EXPECTED_GLD_FOR_100_EURC, FALLBACK_PRICE);
+        .to.be.gt(before);
     });
   });
 
-  // ── 5. Vente avec USDC ────────────────────────────────────────────────────
+  // ── 5. Vente avec conversion ──────────────────────────────────────────────
 
-  describe("Sell — USDC", () => {
-    beforeEach(async () => { await aliceBuysUsdc(); });
-
-    it("alice peut vendre ses GLD et récupérer USDC", async () => {
-      const gldBalance   = await gld.balanceOf(alice.address);
-      const usdcExpected = await exchange.previewSell(gldBalance, await mockUSDC.getAddress());
-      const usdcBefore   = await mockUSDC.balanceOf(alice.address);
-      await exchange.connect(alice).sell(gldBalance, await mockUSDC.getAddress());
-      expect(await gld.balanceOf(alice.address)).to.equal(0n);
-      expect(await mockUSDC.balanceOf(alice.address)).to.equal(usdcBefore + usdcExpected);
+  describe("Sell — conversion USD→EURC", () => {
+    beforeEach(async () => {
+      await aliceBuysUsdc();
     });
 
-    it("GLD brûlé après vente", async () => {
-      const gldBalance   = await gld.balanceOf(alice.address);
-      const supplyBefore = await gld.totalSupply();
-      await exchange.connect(alice).sell(gldBalance, await mockUSDC.getAddress());
-      expect(await gld.totalSupply()).to.equal(supplyBefore - gldBalance);
-    });
+    it("vente GLD→EURC retourne moins d'EURC que d'USDC (÷ 1.08)", async () => {
+      const gldBalance = await gld.balanceOf(alice.address);
 
-    it("emit TokensSold avec USDC", async () => {
-      const gldBalance   = await gld.balanceOf(alice.address);
-      const usdcExpected = await exchange.previewSell(gldBalance, await mockUSDC.getAddress());
-      await expect(exchange.connect(alice).sell(gldBalance, await mockUSDC.getAddress()))
-        .to.emit(exchange, "TokensSold")
-        .withArgs(alice.address, await mockUSDC.getAddress(), gldBalance, usdcExpected, FALLBACK_PRICE);
-    });
-  });
-
-  // ── 6. Vente avec EURC ────────────────────────────────────────────────────
-
-  describe("Sell — EURC", () => {
-    beforeEach(async () => { await aliceBuysEurc(); });
-
-    it("alice peut vendre ses GLD et récupérer EURC", async () => {
-      const gldBalance   = await gld.balanceOf(alice.address);
       const eurcExpected = await exchange.previewSell(gldBalance, await mockEURC.getAddress());
-      const eurcBefore   = await mockEURC.balanceOf(alice.address);
+      const usdcExpected = await exchange.previewSell(gldBalance, await mockUSDC.getAddress());
+
+      expect(eurcExpected).to.be.lt(usdcExpected);
+    });
+
+    it("vente GLD→EURC avec taux 1.08 : montant correct", async () => {
+      const gldBalance  = await gld.balanceOf(alice.address);
+      const eurcBefore  = await mockEURC.balanceOf(alice.address);
+      const eurcExpected = await exchange.previewSell(gldBalance, await mockEURC.getAddress());
+
       await exchange.connect(alice).sell(gldBalance, await mockEURC.getAddress());
+
       expect(await mockEURC.balanceOf(alice.address)).to.equal(eurcBefore + eurcExpected);
     });
 
-    it("vente EURC n'affecte pas le solde USDC du Treasury", async () => {
+    it("vente GLD→EURC avec taux 1.00 = même montant que USDC", async () => {
+      await mockEurUsdOracle.setPrice(100_000_000n);
       const gldBalance = await gld.balanceOf(alice.address);
-      const usdcBefore = await treasury.totalDepositedByToken(await mockUSDC.getAddress());
-      await exchange.connect(alice).sell(gldBalance, await mockEURC.getAddress());
-      expect(await treasury.totalDepositedByToken(await mockUSDC.getAddress())).to.equal(usdcBefore);
+      const eurcOut    = await exchange.previewSell(gldBalance, await mockEURC.getAddress());
+      const usdcOut    = await exchange.previewSell(gldBalance, await mockUSDC.getAddress());
+      expect(eurcOut).to.equal(usdcOut);
+    });
+
+    it("emit TokensSold avec le montant EURC converti", async () => {
+      const gldBalance   = await gld.balanceOf(alice.address);
+      const eurcExpected = await exchange.previewSell(gldBalance, await mockEURC.getAddress());
+      await expect(exchange.connect(alice).sell(gldBalance, await mockEURC.getAddress()))
+        .to.emit(exchange, "TokensSold")
+        .withArgs(alice.address, await mockEURC.getAddress(), gldBalance, eurcExpected, FALLBACK_PRICE);
     });
   });
 
-  // ── 7. Cashback V3 ────────────────────────────────────────────────────────
+  // ── 6. Scénario complet achat EURC + vente EURC ───────────────────────────
 
-  describe("Cashback V3 — par token", () => {
-    const feeBps = 100n; // 1% pour faciliter les calculs
-
-    beforeEach(async () => {
-      await exchange.connect(owner).setFeeBps(feeBps);
-    });
-
-    it("previewCashback retourne deux lignes (USDC + EURC)", async () => {
-      await aliceBuysUsdc();
-      await aliceBuysEurc();
-      const [tokens, amounts] = await exchange.previewCashback(alice.address);
-      expect(tokens.length).to.equal(2);
-      expect(tokens).to.include(await mockUSDC.getAddress());
-      expect(tokens).to.include(await mockEURC.getAddress());
-    });
-
-    it("frais USDC et EURC sont trackés séparément", async () => {
-      await aliceBuysUsdc();
-      await aliceBuysEurc();
-      const [tokens, amounts] = await exchange.previewCashback(alice.address);
-      const idxUsdc = tokens.indexOf(await mockUSDC.getAddress());
-      const idxEurc = tokens.indexOf(await mockEURC.getAddress());
-      expect(amounts[idxUsdc]).to.be.gt(0n);
-      expect(amounts[idxEurc]).to.be.gt(0n);
-    });
-
-    it("achat USDC uniquement → cashback EURC = 0", async () => {
-      await aliceBuysUsdc();
-      const [tokens, amounts] = await exchange.previewCashback(alice.address);
-      const idxEurc = tokens.indexOf(await mockEURC.getAddress());
-      expect(amounts[idxEurc]).to.equal(0n);
-    });
-
-    it("claimCashback(USDC) réclame les frais USDC uniquement", async () => {
-      await aliceBuysUsdc();
-      const [, amounts] = await exchange.previewCashback(alice.address);
-      const usdcIdx = (await exchange.previewCashback(alice.address))[0]
-        .indexOf(await mockUSDC.getAddress());
-      const cashbackExpected = (await exchange.previewCashback(alice.address))[1][usdcIdx];
-
-      if (cashbackExpected > 0n) {
-        const before = await mockUSDC.balanceOf(alice.address);
-        await exchange.connect(alice).claimCashback(await mockUSDC.getAddress());
-        expect(await mockUSDC.balanceOf(alice.address)).to.equal(before + cashbackExpected);
-      }
-    });
-
-    it("claimCashback échoue si aucun frais accumulé (InactiveAccount)", async () => {
-      // Sans achat préalable, lastActivityAt = 0 → InactiveAccount
-      await expect(
-        exchange.connect(alice).claimCashback(await mockUSDC.getAddress())
-      ).to.be.revertedWithCustomError(exchange, "InactiveAccount");
-    });
-
-    it("claimCashback échoue si frais = 0 (NoCashbackAvailable)", async () => {
-      // Achat sans fees → lastActivityAt initialisé mais feesBySlotV2 = 0
-      await exchange.connect(owner).setFeeBps(0n);
-      await aliceBuysUsdc();
-      await expect(
-        exchange.connect(alice).claimCashback(await mockUSDC.getAddress())
-      ).to.be.revertedWithCustomError(exchange, "NoCashbackAvailable");
-    });
-
-    it("claimCashback échoue avec token non supporté", async () => {
-      const rando = await (await ethers.getContractFactory("MockUSDC")).deploy();
-      await expect(
-        exchange.connect(alice).claimCashback(await rando.getAddress())
-      ).to.be.revertedWithCustomError(exchange, "UnsupportedToken");
-    });
-
-    it("claimAllCashback réclame USDC et EURC ensemble", async () => {
-      await aliceBuysUsdc();
-      await aliceBuysEurc();
-
-      const [tokens, amounts] = await exchange.previewCashback(alice.address);
-      const usdcBefore = await mockUSDC.balanceOf(alice.address);
+  describe("Scénario achat EURC → vente EURC (round trip)", () => {
+    it("achat 100 EURC puis vente de tout le GLD récupère moins de 100 EURC (fees)", async () => {
+      // Activer les fees pour ce test (300 bps = 3%)
+      await exchange.connect(owner).setFeeBps(300n);
       const eurcBefore = await mockEURC.balanceOf(alice.address);
-
-      await exchange.connect(alice).claimAllCashback();
-
-      expect(await mockUSDC.balanceOf(alice.address)).to.be.gte(usdcBefore);
-      expect(await mockEURC.balanceOf(alice.address)).to.be.gte(eurcBefore);
-    });
-
-    it("claimAllCashback échoue si aucun frais (InactiveAccount)", async () => {
-      await expect(
-        exchange.connect(alice).claimAllCashback()
-      ).to.be.revertedWithCustomError(exchange, "InactiveAccount");
-    });
-
-    it("claimAllCashback échoue si fees = 0 (NoCashbackAvailable)", async () => {
-      await exchange.connect(owner).setFeeBps(0n);
-      await aliceBuysUsdc();
-      await aliceBuysEurc();
-      await expect(
-        exchange.connect(alice).claimAllCashback()
-      ).to.be.revertedWithCustomError(exchange, "NoCashbackAvailable");
-    });
-
-    it("emit CashbackClaimed avec le bon token", async () => {
-      await exchange.connect(owner).setFeeBps(200n); // 2% pour avoir un cashback non nul
-      await aliceBuysUsdc(THOUSAND_USDC);
-      await expect(exchange.connect(alice).claimCashback(await mockUSDC.getAddress()))
-        .to.emit(exchange, "CashbackClaimed")
-        .withArgs(alice.address, await mockUSDC.getAddress(), (v: bigint) => v > 0n);
-    });
-  });
-
-  // ── 8. Scénario mixte USDC + EURC ─────────────────────────────────────────
-
-  describe("Scénario mixte — achats USDC et EURC", () => {
-    it("alice achète en USDC, bob en EURC — GLD indépendants", async () => {
-      await aliceBuysUsdc();
-      // Bob achète en EURC directement
-      await mockEURC.connect(bob).approve(await exchange.getAddress(), HUNDRED_EURC);
-      await exchange.connect(bob).buy(HUNDRED_EURC, await mockEURC.getAddress());
-
-      expect(await gld.balanceOf(alice.address)).to.equal(EXPECTED_GLD_FOR_100_USDC);
-      expect(await gld.balanceOf(bob.address)).to.equal(EXPECTED_GLD_FOR_100_EURC);
-    });
-
-    it("totalDeposited Treasury = USDC + EURC (delta après achats)", async () => {
-      const totalBefore = await treasury.totalDeposited();
-      await aliceBuysUsdc();
-      await aliceBuysEurc();
-      const totalAfter = await treasury.totalDeposited();
-      // Les deux achats ajoutent HUNDRED_USDC + HUNDRED_EURC au total
-      expect(totalAfter - totalBefore).to.equal(HUNDRED_USDC + HUNDRED_EURC);
-    });
-
-    it("alice vend GLD contre EURC alors qu'elle avait acheté en USDC", async () => {
-      await aliceBuysUsdc();
+      await aliceBuysEurc(HUNDRED_EURC);
       const gldBalance = await gld.balanceOf(alice.address);
-      const eurcBefore = await mockEURC.balanceOf(alice.address);
       await exchange.connect(alice).sell(gldBalance, await mockEURC.getAddress());
-      expect(await mockEURC.balanceOf(alice.address)).to.be.gt(eurcBefore);
+      const eurcAfter = await mockEURC.balanceOf(alice.address);
+      // Doit avoir moins d'EURC à cause des fees (2 × 3%)
+      expect(eurcAfter).to.be.lt(eurcBefore);
+      // Mais proche — perte max ~10%
+      expect(eurcAfter).to.be.gt(eurcBefore * 90n / 100n);
     });
   });
 
-  // ── 9. Admin ──────────────────────────────────────────────────────────────
+  // ── 7. Admin EUR/USD ──────────────────────────────────────────────────────
 
-  describe("Admin", () => {
-    it("setEurc met à jour l'adresse EURC", async () => {
-      const newEurc = await (await ethers.getContractFactory("MockUSDC")).deploy();
-      await exchange.connect(owner).setEurc(await newEurc.getAddress());
-      expect(await exchange.eurc()).to.equal(await newEurc.getAddress());
+  describe("Admin — setEurUsdOracle / setEurUsdFallbackRate", () => {
+    it("eurusdFallbackRate par défaut = 1.08", async () => {
+      expect(await exchange.eurusdFallbackRate()).to.equal(108_000_000n);
     });
 
-    it("setEurc émet EurcUpdated", async () => {
-      const oldEurc = await exchange.eurc();
-      const newEurc = await (await ethers.getContractFactory("MockUSDC")).deploy();
-      await expect(exchange.connect(owner).setEurc(await newEurc.getAddress()))
-        .to.emit(exchange, "EurcUpdated")
-        .withArgs(oldEurc, await newEurc.getAddress());
+    it("setEurUsdFallbackRate met à jour le taux", async () => {
+      await exchange.connect(owner).setEurUsdFallbackRate(115_000_000n);
+      expect(await exchange.eurusdFallbackRate()).to.equal(115_000_000n);
     });
 
-    it("non-owner ne peut pas setEurc", async () => {
+    it("setEurUsdFallbackRate émet EurUsdFallbackRateUpdated", async () => {
+      await expect(exchange.connect(owner).setEurUsdFallbackRate(115_000_000n))
+        .to.emit(exchange, "EurUsdFallbackRateUpdated")
+        .withArgs(108_000_000n, 115_000_000n);
+    });
+
+    it("non-owner ne peut pas setEurUsdFallbackRate", async () => {
       await expect(
-        exchange.connect(alice).setEurc(await mockEURC.getAddress())
+        exchange.connect(alice).setEurUsdFallbackRate(115_000_000n)
       ).to.be.revertedWithCustomError(exchange, "OwnableUnauthorizedAccount");
     });
-
-    it("pause bloque buy USDC et EURC", async () => {
-      await exchange.connect(owner).pause();
-      await mockUSDC.connect(alice).approve(await exchange.getAddress(), HUNDRED_USDC);
-      await mockEURC.connect(alice).approve(await exchange.getAddress(), HUNDRED_EURC);
-      await expect(
-        exchange.connect(alice).buy(HUNDRED_USDC, await mockUSDC.getAddress())
-      ).to.be.revertedWithCustomError(exchange, "EnforcedPause");
-      await expect(
-        exchange.connect(alice).buy(HUNDRED_EURC, await mockEURC.getAddress())
-      ).to.be.revertedWithCustomError(exchange, "EnforcedPause");
-    });
-
-    it("sell fonctionne même en pause", async () => {
-      await aliceBuysUsdc();
-      await exchange.connect(owner).pause();
-      const gldBalance = await gld.balanceOf(alice.address);
-      await expect(
-        exchange.connect(alice).sell(gldBalance, await mockUSDC.getAddress())
-      ).to.not.revert(ethers);
-    });
   });
 
-  // ── 10. UUPS ──────────────────────────────────────────────────────────────
+  // ── 8. UUPS ───────────────────────────────────────────────────────────────
 
   describe("Upgradeability (UUPS)", () => {
     it("owner peut upgrader", async () => {

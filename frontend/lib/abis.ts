@@ -1609,6 +1609,7 @@ export const TreasuryABI = [
 ] as const;
 
 // ── Exchange ──────────────────────────────────────────────
+// ── Exchange ──────────────────────────────────────────────
 export const ExchangeABI = [
   {
     "inputs": [],
@@ -1825,6 +1826,44 @@ export const ExchangeABI = [
       }
     ],
     "name": "ContractsUnpaused",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oldRate",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newRate",
+        "type": "uint256"
+      }
+    ],
+    "name": "EurUsdFallbackRateUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "oldOracle",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOracle",
+        "type": "address"
+      }
+    ],
+    "name": "EurUsdOracleUpdated",
     "type": "event"
   },
   {
@@ -2120,6 +2159,19 @@ export const ExchangeABI = [
   },
   {
     "inputs": [],
+    "name": "EUR_USD_DECIMALS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "TELLOR_DECIMALS_FACTOR",
     "outputs": [
       {
@@ -2236,6 +2288,32 @@ export const ExchangeABI = [
   },
   {
     "inputs": [],
+    "name": "eurusdFallbackRate",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "eurusdOracle",
+    "outputs": [
+      {
+        "internalType": "contract AggregatorV3Interface",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "fallbackPrice",
     "outputs": [
       {
@@ -2321,6 +2399,24 @@ export const ExchangeABI = [
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getEurUsdRate",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "rate",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "isLive",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -2650,6 +2746,32 @@ export const ExchangeABI = [
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "newRate",
+        "type": "uint256"
+      }
+    ],
+    "name": "setEurUsdFallbackRate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOracle",
+        "type": "address"
+      }
+    ],
+    "name": "setEurUsdOracle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "eurcAddress",
         "type": "address"
@@ -2830,7 +2952,6 @@ export const ExchangeABI = [
   }
 ] as const;
 
-// ── Reserve ──────────────────────────────────────────────
 export const ReserveABI = [
   {
     "inputs": [],

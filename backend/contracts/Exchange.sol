@@ -27,7 +27,6 @@ interface IGLD {
     function decimals() external view returns (uint8);
 }
 
-/// @dev Interface Treasury V2 multi-token
 interface ITreasury {
     function deposit(uint256 amount, address token) external;
     function withdraw(uint256 amount, address token) external;
@@ -37,19 +36,19 @@ interface ITreasury {
     function eurc() external view returns (address);
 }
 
-/// @title Exchange V3 — Achat/vente GLD contre USDC ou EURC
+/// @title Exchange V4 — Achat/vente GLD contre USDC ou EURC avec conversion EUR/USD
 /// @notice Multi-token : buy/sell acceptent USDC et EURC
-///         Cashback tracké séparément par devise dans feesBySlotV2
+///         Oracle EUR/USD Chainlink pour conversion correcte EURC→USD
 /// @dev UUPS upgradeable
 ///
-/// Changements V3 :
-///   - buy(amount, token) / sell(gldAmount, token) — paramètre token ajouté
-///   - previewBuy(amount, token) / previewSell(gldAmount, token)
-///   - feesBySlotV2 (slot 14) : mapping(user => mapping(token => uint256[8]))
-///   - claimCashback(token) / claimAllCashback()
-///   - previewCashback(user) → (address[] tokens, uint256[] amounts)
-///   - eurc (slot 13) : adresse EURC Circle
-///   - feesBySlot (slot 9) : conservé mais ignoré (données V1)
+/// Changements V4 vs V3 :
+///   - eurusdOracle (slot 15) : oracle Chainlink EUR/USD
+///   - eurusdFallbackRate (slot 16) : taux fallback EUR/USD (ex: 1.08e8)
+///   - _toUsd(amount, token) : helper de conversion EUR→USD
+///   - previewBuy/buy : applique taux EUR/USD si token = EURC
+///   - previewSell/sell : applique conversion inverse USD→EUR si token = EURC
+///   - getEurUsdRate() : vue publique du taux actuel
+///   - __gap passe de [35] à [33]
 contract Exchange is
     Initializable,
     OwnableUpgradeable,
@@ -61,24 +60,23 @@ contract Exchange is
 
     // ─── Storage ─────────────────────────────────────────────────────────────
     //
-    // Slots V1/V2 — NE JAMAIS RÉORDONNER
     //  0. gld
     //  1. treasury
-    //  2. usdc            (conservé pour compatibilité)
+    //  2. usdc
     //  3. priceOracle
     //  4. fallbackPrice
     //  5. oracleMaxAge
     //  6. feeBps
     //  7. feeCollector
     //  8. deployedAt
-    //  9. feesBySlot      (V1 déprécié — conservé)
+    //  9. feesBySlot        (V1 déprécié)
     // 10. lastActivityAt
     // 11. cashbackBps
     // 12. tellorOracle
-    //
-    // Slots V3 — nouveaux
-    // 13. eurc
-    // 14. feesBySlotV2
+    // 13. eurc              (V3)
+    // 14. feesBySlotV2      (V3)
+    // 15. eurusdOracle      (V4) — Chainlink EUR/USD
+    // 16. eurusdFallbackRate (V4) — taux fallback en 8 décimales
     //
 
     IGLD      public gld;           // slot 0
@@ -103,9 +101,13 @@ contract Exchange is
     IERC20 public eurc;                                       // slot 13 V3
     mapping(address => mapping(address => uint256[8])) public feesBySlotV2; // slot 14 V3
 
+    AggregatorV3Interface public eurusdOracle;   // slot 15 V4
+    uint256 public eurusdFallbackRate;           // slot 16 V4 — ex: 108_000_000 = 1.08 (8 dec)
+
     bytes32 public constant TELLOR_XAU_USD_QUERY_ID =
         0x5c13cd9c97dbb98f2429c101a2a8150e6c7a0ddaff6124ee176a3a411067ded0;
     uint256 public constant TELLOR_DECIMALS_FACTOR = 1e10;
+    uint256 public constant EUR_USD_DECIMALS = 1e8; // 8 décimales Chainlink EUR/USD
 
     // ─── Events ──────────────────────────────────────────────────────────────
 
@@ -114,6 +116,8 @@ contract Exchange is
     event FallbackPriceUpdated(uint256 oldPrice, uint256 newPrice);
     event OracleUpdated(address indexed oldOracle, address indexed newOracle);
     event TellorOracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event EurUsdOracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event EurUsdFallbackRateUpdated(uint256 oldRate, uint256 newRate);
     event OracleMaxAgeUpdated(uint256 oldMaxAge, uint256 newMaxAge);
     event FeeBpsUpdated(uint256 oldFee, uint256 newFee);
     event FeeCollectorUpdated(address indexed oldCollector, address indexed newCollector);
@@ -160,14 +164,15 @@ contract Exchange is
             priceOracle = AggregatorV3Interface(oracleAddress);
         }
 
-        fallbackPrice = initFallbackPrice;
-        oracleMaxAge  = 3600;
-        feeCollector  = initialOwner;
-        deployedAt    = block.timestamp;
-        cashbackBps   = 50;
+        fallbackPrice      = initFallbackPrice;
+        oracleMaxAge       = 3600;
+        feeCollector       = initialOwner;
+        deployedAt         = block.timestamp;
+        cashbackBps        = 50;
+        eurusdFallbackRate = 108_000_000; // 1.08 par défaut
     }
 
-    // ─── Prix ────────────────────────────────────────────────────────────────
+    // ─── Oracle XAU/USD ───────────────────────────────────────────────────────
 
     function _getChainlinkPrice() internal view returns (uint256 price, bool valid) {
         if (address(priceOracle) == address(0)) return (0, false);
@@ -215,6 +220,50 @@ contract Exchange is
         (activePrice,    activeSource) = getPrice();
     }
 
+    // ─── Oracle EUR/USD ───────────────────────────────────────────────────────
+
+    /// @notice Retourne le taux EUR/USD actuel (8 décimales)
+    /// @dev Ex : 108_500_000 = 1.085 USD pour 1 EUR
+    /// @return rate   Taux EUR/USD (8 décimales)
+    /// @return isLive true si l'oracle Chainlink répond, false si fallback
+    function getEurUsdRate() public view returns (uint256 rate, bool isLive) {
+        if (address(eurusdOracle) != address(0)) {
+            try eurusdOracle.latestRoundData() returns (
+                uint80, int256 answer, uint256, uint256 updatedAt, uint80
+            ) {
+                if (answer > 0 && block.timestamp - updatedAt <= oracleMaxAge) {
+                    return (uint256(answer), true);
+                }
+            } catch {}
+        }
+        // Fallback : taux configuré par l'owner (défaut 1.08)
+        return (eurusdFallbackRate, false);
+    }
+
+    /// @dev Convertit un montant de stablecoin en USD équivalent (6 décimales)
+    ///      USDC : 1 USDC = 1 USD → pas de conversion
+    ///      EURC : 1 EURC = eurUsdRate USD → multiplication par le taux
+    function _toUsd(uint256 amount, address token) internal view returns (uint256 usdAmount) {
+        if (token == address(eurc) && address(eurc) != address(0)) {
+            (uint256 rate, ) = getEurUsdRate();
+            // amount (6 dec) * rate (8 dec) / 1e8 = usdAmount (6 dec)
+            return (amount * rate) / EUR_USD_DECIMALS;
+        }
+        return amount; // USDC : 1:1
+    }
+
+    /// @dev Convertit un montant USD (6 dec) en stablecoin de sortie
+    ///      USDC : 1 USD = 1 USDC → pas de conversion
+    ///      EURC : 1 USD = 1/eurUsdRate EURC → division par le taux
+    function _fromUsd(uint256 usdAmount, address token) internal view returns (uint256 stableAmount) {
+        if (token == address(eurc) && address(eurc) != address(0)) {
+            (uint256 rate, ) = getEurUsdRate();
+            // usdAmount (6 dec) * 1e8 / rate (8 dec) = eurcAmount (6 dec)
+            return (usdAmount * EUR_USD_DECIMALS) / rate;
+        }
+        return usdAmount; // USDC : 1:1
+    }
+
     // ─── Validation token ─────────────────────────────────────────────────────
 
     function _requireSupportedToken(address token) internal view {
@@ -225,6 +274,8 @@ contract Exchange is
 
     // ─── Preview ─────────────────────────────────────────────────────────────
 
+    /// @notice Calcule le GLD reçu pour un montant de stablecoin
+    /// @dev EURC : converti en USD via oracle EUR/USD avant calcul
     function previewBuy(uint256 stableAmount, address token)
         public view returns (uint256 gldAmount)
     {
@@ -233,18 +284,25 @@ contract Exchange is
         (uint256 price, ) = getPrice();
         uint256 feeAmount = (stableAmount * feeBps) / BASIS_POINTS;
         uint256 netAmount = stableAmount - feeAmount;
-        gldAmount = (netAmount * 1e5) / price;
+        // Convertir en USD si EURC
+        uint256 netUsd = _toUsd(netAmount, token);
+        gldAmount = (netUsd * 1e5) / price;
     }
 
+    /// @notice Calcule le stablecoin reçu pour un montant de GLD vendu
+    /// @dev EURC : montant USD converti en EURC via oracle EUR/USD
     function previewSell(uint256 gldAmount, address token)
         public view returns (uint256 stableAmount)
     {
         if (gldAmount == 0) revert ZeroAmount();
         _requireSupportedToken(token);
         (uint256 price, ) = getPrice();
-        uint256 grossAmount = (gldAmount * price) / 1e5;
-        uint256 feeAmount   = (grossAmount * feeBps) / BASIS_POINTS;
-        stableAmount = grossAmount - feeAmount;
+        // Calcul en USD
+        uint256 grossUsd  = (gldAmount * price) / 1e5;
+        uint256 feeUsd    = (grossUsd * feeBps) / BASIS_POINTS;
+        uint256 netUsd    = grossUsd - feeUsd;
+        // Convertir USD → stablecoin de sortie
+        stableAmount = _fromUsd(netUsd, token);
     }
 
     // ─── Achat ───────────────────────────────────────────────────────────────
@@ -276,10 +334,10 @@ contract Exchange is
         IERC20(token).forceApprove(address(treasury), netAmount);
         treasury.deposit(netAmount, token);
 
-        // Mint GLD (pattern CEI — avant fees)
+        // Mint GLD
         gld.mint(msg.sender, gldAmount);
 
-        // Fees en dernier
+        // Fees
         if (feeAmount > 0 && feeCollector != address(0)) {
             IERC20(token).safeTransfer(feeCollector, feeAmount);
         }
@@ -299,24 +357,31 @@ contract Exchange is
         _requireSupportedToken(token);
 
         (uint256 price,) = getPrice();
-        uint256 grossAmount = (gldAmount * price) / 1e5;
-        uint256 feeAmount   = (grossAmount * feeBps) / BASIS_POINTS;
-        uint256 netAmount   = grossAmount - feeAmount;
-        if (netAmount == 0) revert ZeroAmount();
 
-        // Tracking cashback V3 par token
+        // Calcul en USD
+        uint256 grossUsd = (gldAmount * price) / 1e5;
+        uint256 feeUsd   = (grossUsd * feeBps) / BASIS_POINTS;
+        uint256 netUsd   = grossUsd - feeUsd;
+        if (netUsd == 0) revert ZeroAmount();
+
+        // Convertir USD → stablecoin de sortie
+        uint256 netStable = _fromUsd(netUsd, token);
+        uint256 feeStable = _fromUsd(feeUsd, token);
+        if (netStable == 0) revert ZeroAmount();
+
+        // Tracking cashback V3 par token (en unités du stablecoin)
         lastActivityAt[msg.sender] = block.timestamp;
-        feesBySlotV2[msg.sender][token][_currentSlot()] += feeAmount;
+        feesBySlotV2[msg.sender][token][_currentSlot()] += feeStable;
 
         // Burn GLD (pattern CEI)
         gld.burn(msg.sender, gldAmount);
 
-        if (feeAmount > 0 && feeCollector != address(0)) {
-            treasury.operatorWithdraw(feeCollector, feeAmount, token);
+        if (feeStable > 0 && feeCollector != address(0)) {
+            treasury.operatorWithdraw(feeCollector, feeStable, token);
         }
-        treasury.operatorWithdraw(msg.sender, netAmount, token);
+        treasury.operatorWithdraw(msg.sender, netStable, token);
 
-        emit TokensSold(msg.sender, token, gldAmount, netAmount, price);
+        emit TokensSold(msg.sender, token, gldAmount, netStable, price);
     }
 
     // ─── Admin ───────────────────────────────────────────────────────────────
@@ -352,6 +417,22 @@ contract Exchange is
         tellorOracle = ITellorOracle(newOracle);
     }
 
+    /// @notice Configure l'oracle Chainlink EUR/USD — V4
+    /// @dev Sepolia : 0x1a81afB8146aeFfCFc5E50e8479e826E7D55b910
+    ///      Mainnet : 0x1a81afB8146aeFfCFc5E50e8479e826E7D55b910
+    function setEurUsdOracle(address newOracle) external onlyOwner {
+        emit EurUsdOracleUpdated(address(eurusdOracle), newOracle);
+        eurusdOracle = AggregatorV3Interface(newOracle);
+    }
+
+    /// @notice Configure le taux EUR/USD fallback (8 décimales)
+    /// @dev Ex : 108_500_000 = 1.085. Utilisé si l'oracle est indisponible.
+    function setEurUsdFallbackRate(uint256 newRate) external onlyOwner {
+        if (newRate == 0) revert ZeroAmount();
+        emit EurUsdFallbackRateUpdated(eurusdFallbackRate, newRate);
+        eurusdFallbackRate = newRate;
+    }
+
     function setOracleMaxAge(uint256 newMaxAge) external onlyOwner {
         emit OracleMaxAgeUpdated(oracleMaxAge, newMaxAge);
         oracleMaxAge = newMaxAge;
@@ -368,7 +449,7 @@ contract Exchange is
         feeCollector = newCollector;
     }
 
-    // ─── Cashback V3 ──────────────────────────────────────────────────────────
+    // ─── Cashback V3 (inchangé) ───────────────────────────────────────────────
 
     function _currentSlot() internal view returns (uint256) {
         uint256 elapsed = block.timestamp - deployedAt;
@@ -389,7 +470,6 @@ contract Exchange is
         cashbackBps = _cashbackBps;
     }
 
-    /// @notice Cashback disponible pour un user (USDC + EURC séparément)
     function previewCashback(address user)
         external view
         returns (address[] memory tokens, uint256[] memory amounts)
@@ -400,11 +480,9 @@ contract Exchange is
         for (uint256 t = 0; t < 2; t++) {
             if (tkns[t] != address(0)) count++;
         }
-
         tokens  = new address[](count);
         amounts = new uint256[](count);
         uint256 idx = 0;
-
         for (uint256 t = 0; t < 2; t++) {
             address token = tkns[t];
             if (token == address(0)) continue;
@@ -425,7 +503,6 @@ contract Exchange is
         }
     }
 
-    /// @notice Réclame le cashback pour un token spécifique
     function claimCashback(address token) external nonReentrant whenNotPaused {
         _requireSupportedToken(token);
         if (block.timestamp - lastActivityAt[msg.sender] > 180 days)
@@ -447,7 +524,6 @@ contract Exchange is
         emit CashbackClaimed(msg.sender, token, cashback);
     }
 
-    /// @notice Réclame le cashback USDC et EURC en une seule tx
     function claimAllCashback() external nonReentrant whenNotPaused {
         if (block.timestamp - lastActivityAt[msg.sender] > 180 days)
             revert InactiveAccount();
@@ -459,7 +535,6 @@ contract Exchange is
         for (uint256 t = 0; t < 2; t++) {
             address token = tokens[t];
             if (token == address(0)) continue;
-
             uint256 totalFees = 0;
             for (uint256 i = 0; i < 4; i++) {
                 if (currentSlot >= i) {
@@ -484,7 +559,7 @@ contract Exchange is
 
     // ─── Storage gap ─────────────────────────────────────────────────────────
     //
-    // 15 slots explicites (0-14) + __gap[35] = 50 ✅
+    // 17 slots explicites (0-16) + __gap[33] = 50 ✅
 
-    uint256[35] private __gap;
+    uint256[33] private __gap;
 }

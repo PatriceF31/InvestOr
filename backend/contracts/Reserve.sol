@@ -58,6 +58,9 @@ interface IExchange {
     function setFeeCollector(address newCollector) external;
     function initCashback(uint256 deployedAt_, uint256 cashbackBps_) external;
     function setEurc(address eurcAddress) external;  // V3
+    function setEurUsdOracle(address oracle) external;  // V4
+    function setOracleMaxAge(uint256 newMaxAge) external;  // V4
+    function setEurUsdFallbackRate(uint256 newRate) external;  // V4
 }
 
 /// @dev Interface LingotOr pour le Proof of Reserve en mode grammes
@@ -452,6 +455,24 @@ contract Reserve is
     /// @notice Configure l'adresse EURC sur Exchange (V3)
     function setExchangeEurc(address eurcAddress) external onlyOwner {
         IExchange(address(exchange)).setEurc(eurcAddress);
+    }
+
+    /// @notice Configure l'oracle EUR/USD sur Exchange V4
+    /// @dev Sepolia + Mainnet : 0x1a81afB8146aeFfCFc5E50e8479e826E7D55b910
+    function setExchangeEurUsdOracle(address newEurUsdOracle) external onlyOwner {
+        IExchange(address(exchange)).setEurUsdOracle(newEurUsdOracle);
+    }
+
+    /// @notice Configure l'oracleMaxAge sur Exchange
+    /// @dev Utile pour les feeds Sepolia moins fréquents (ex: 86400 = 24h)
+    function setExchangeOracleMaxAge(uint256 newMaxAge) external onlyOwner {
+        IExchange(address(exchange)).setOracleMaxAge(newMaxAge);
+    }
+
+    /// @notice Configure le taux EUR/USD fallback sur Exchange V4
+    /// @dev Ex: 116230500 = 1.1623 (8 décimales)
+    function setExchangeEurUsdFallbackRate(uint256 newRate) external onlyOwner {
+        IExchange(address(exchange)).setEurUsdFallbackRate(newRate);
     }
 
     function addRecapitalizer(address account) external onlyOwner {

@@ -121,6 +121,18 @@ function BuyPanel() {
   const priceSource = priceData?.[1] ?? 3;
   const isOracle    = priceSource <= 2;
 
+  // Taux EUR/USD — getEurUsdRate() retourne (uint256, bool)
+  const { data: eurUsdRaw } = useReadContract({
+    ...exchange, functionName: "getEurUsdRate",
+    query: { refetchInterval: 60_000 },
+  });
+  const eurUsdData  = eurUsdRaw as [bigint, boolean] | undefined;
+  const eurUsdRate  = eurUsdData?.[0];
+  const eurUsdLive  = eurUsdData?.[1] ?? false;
+  const eurUsdStr   = eurUsdRate !== undefined
+    ? `$${(Number(eurUsdRate) / 1e8).toFixed(4)}`
+    : "—";
+
   const stableParsed = stableInput && Number(stableInput) > 0
     ? parseUnits(stableInput, 6) : undefined;
 
@@ -247,6 +259,12 @@ function BuyPanel() {
           value={isOracle
             ? (priceSource === 0 ? "Chainlink + Tellor" : priceSource === 1 ? "Chainlink" : "Tellor")
             : t("fallback_price")} />
+        {selectedToken === "EURC" && (
+          <DetailRow
+            label={`Taux EUR/USD${eurUsdLive ? "" : " (fallback)"}`}
+            value={eurUsdStr}
+          />
+        )}
         <DetailRow label={t("fees")} value={feePercent} />
         <DetailRow label={t("step1")} value={step === "approving" ? t("step1_pending") : t("step1")} />
         <DetailRow label={t("step2")} value={step === "buying"   ? t("step2_pending") : t("step2")} />
@@ -291,6 +309,18 @@ function SellPanel() {
   const price       = priceData?.[0];
   const priceSource = priceData?.[1] ?? 3;
   const isOracle    = priceSource <= 2;
+
+  // Taux EUR/USD — getEurUsdRate() retourne (uint256, bool)
+  const { data: eurUsdRaw } = useReadContract({
+    ...exchange, functionName: "getEurUsdRate",
+    query: { refetchInterval: 60_000 },
+  });
+  const eurUsdData  = eurUsdRaw as [bigint, boolean] | undefined;
+  const eurUsdRate  = eurUsdData?.[0];
+  const eurUsdLive  = eurUsdData?.[1] ?? false;
+  const eurUsdStr   = eurUsdRate !== undefined
+    ? `$${(Number(eurUsdRate) / 1e8).toFixed(4)}`
+    : "—";
 
   const gldParsed = gldInput && Number(gldInput) > 0
     ? parseUnits(gldInput, 3) : undefined;
@@ -383,6 +413,12 @@ function SellPanel() {
           value={isOracle
             ? (priceSource === 0 ? "Chainlink + Tellor" : priceSource === 1 ? "Chainlink" : "Tellor")
             : t("fallback_price")} />
+        {selectedToken === "EURC" && (
+          <DetailRow
+            label={`Taux EUR/USD${eurUsdLive ? "" : " (fallback)"}`}
+            value={eurUsdStr}
+          />
+        )}
         <DetailRow label={t("fees")} value={feePercent} />
       </div>
 
