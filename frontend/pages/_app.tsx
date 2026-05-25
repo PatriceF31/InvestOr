@@ -24,8 +24,20 @@ const goldDark = darkTheme({
   fontStack: "system",
 });
 
+// Cache des messages pour la navigation client-side
+let cachedMessages: Record<string, any> = {};
+let cachedLocale = "fr";
+
 export default function App({ Component, pageProps }: AppProps) {
-  const { messages, locale } = pageProps;
+  // Mettre à jour le cache si de nouveaux messages arrivent
+  if (pageProps.messages) {
+    cachedMessages = pageProps.messages;
+  }
+  if (pageProps.locale) {
+    cachedLocale = pageProps.locale;
+  }
+  const messages = cachedMessages;
+  const locale   = pageProps.locale ?? cachedLocale;
 
   return (
     <WagmiProvider config={wagmiConfig}>
@@ -35,10 +47,13 @@ export default function App({ Component, pageProps }: AppProps) {
             locale={locale ?? "fr"}
             messages={messages ?? {}}
             onError={(error) => {
+              // Ignorer les erreurs de messages manquants — se produit
+              // lors de la navigation côté client entre pages SSG
               if (error.code === "ENVIRONMENT_FALLBACK") return;
+              if (error.code === "MISSING_MESSAGE") return;
               console.error(error);
             }}
-            getMessageFallback={({ key }) => key}
+            getMessageFallback={({ namespace, key }) => `${namespace}.${key}`}
           >
             <Layout>
               <Component {...pageProps} />

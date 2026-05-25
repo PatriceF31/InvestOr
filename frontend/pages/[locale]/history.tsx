@@ -36,7 +36,7 @@ function EntryRow({ entry, config }: {
   // V3 : détecter le token pour BUY/SELL
   const tokenSymbol = (() => {
     if (!entry.token) return "USDC";
-    const t = entry.token.toLowerCase();
+    const t = (entry.token ?? "").toLowerCase();
     if (t === "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238") return "USDC";
     if (t === "0x08210f9170f89ab7658f0b5e3ff39b0e03c594d4") return "EURC";
     return "USDC";
@@ -53,7 +53,7 @@ function EntryRow({ entry, config }: {
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm">{cfg.label}</p>
         <p className="text-xs text-muted-foreground font-mono truncate">
-          {entry.address.slice(0, 6)}...{entry.address.slice(-4)}
+          {(entry.address ?? '').slice(0, 6)}...{(entry.address ?? '').slice(-4)}
         </p>
       </div>
       <div className="text-right">
@@ -76,7 +76,7 @@ function EntryRow({ entry, config }: {
           <p>Bloc {entry.blockNumber.toString()}</p>
         )}
         <a
-          href={`https://sepolia.etherscan.io/tx/${entry.txHash}`}
+          href={entry.txHash ? `https://sepolia.etherscan.io/tx/${entry.txHash}` : '#'}
           target="_blank"
           rel="noopener noreferrer"
           className="text-primary hover:underline"
@@ -170,9 +170,9 @@ export default function HistoryPage() {
       const all: LogEntry[] = [
         ...buyLogs.map((l: any) => ({
           type: "BUY" as const,
-          address: l.args.buyer,
+          address: l.args.buyer ?? l.args.from ?? "",
           amount: l.args.gldAmount,
-          token: l.args.token,          // V3: token USDC ou EURC
+          token: l.args.token ?? undefined,
           stableAmount: l.args.stableAmount, // V3
           price: l.args.price,
           txHash: l.transactionHash,
@@ -181,9 +181,9 @@ export default function HistoryPage() {
         })),
         ...sellLogs.map((l: any) => ({
           type: "SELL" as const,
-          address: l.args.seller,
+          address: l.args.seller ?? l.args.to ?? "",
           amount: l.args.gldAmount,
-          token: l.args.token,          // V3: token USDC ou EURC
+          token: l.args.token ?? undefined,
           stableAmount: l.args.stableAmount, // V3
           price: l.args.price,
           txHash: l.transactionHash,
@@ -225,7 +225,7 @@ export default function HistoryPage() {
   if (!mounted) return null;
 
   const userEntries = address
-    ? entries.filter(e => e.address.toLowerCase() === address.toLowerCase())
+    ? entries.filter(e => e.address && e.address.toLowerCase() === address.toLowerCase())
     : [];
 
   const EntriesList = ({ list }: { list: LogEntry[] }) => (
