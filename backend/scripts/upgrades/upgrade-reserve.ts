@@ -14,7 +14,7 @@ const UUPS_ABI = [
 ];
 
 async function main() {
-  const { ethers } = await network.connect();
+  const { ethers } = await network.create();
   const [deployer] = await ethers.getSigners();
 
   console.log("\n═══════════════════════════════════════════════════════");

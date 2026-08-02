@@ -25,6 +25,9 @@ interface ITreasuryReserve {
     function eurc() external view returns (address);
     /// @notice Injection capital V2 — paramètre token requis
     function injectCapital(uint256 amount, address token) external;
+    /// @notice Poche rendement V3 (2.2)
+    function setYieldStrategy(address newStrategy) external;
+    function rebalance(address token, uint256 targetLiquidBps) external;
 }
 
 /// @dev Interface Oracle Chainlink
@@ -134,6 +137,8 @@ contract Reserve is
     event RecapitalizerAdded(address indexed account);
     event RecapitalizerRemoved(address indexed account);
     event LingotOrUpdated(address indexed oldAddr, address indexed newAddr);
+    event TreasuryYieldStrategyUpdated(address indexed newStrategy);
+    event YieldRebalanceTriggered(address indexed token, uint256 targetLiquidBps);
 
     // ─── Errors ──────────────────────────────────────────────────────────────
 
@@ -509,6 +514,20 @@ contract Reserve is
 
     function initExchangeCashback(uint256 deployedAt_, uint256 cashbackBps_) external onlyOwner {
         IExchange(address(exchange)).initCashback(deployedAt_, cashbackBps_);
+    }
+
+    /// @notice Configure la stratégie de rendement Treasury (2.2)
+    /// @dev Relais vers Treasury — même pattern que les fonctions setExchangeX
+    function setTreasuryYieldStrategy(address newStrategy) external onlyOwner {
+        ITreasuryReserve(address(treasury)).setYieldStrategy(newStrategy);
+        emit TreasuryYieldStrategyUpdated(newStrategy);
+    }
+
+    /// @notice Déclenche un rééquilibrage liquide/rendement sur Treasury
+    /// @dev Manuel dans cette V1 — automatisable via ReserveKeeper plus tard si besoin
+    function rebalanceYield(address token, uint256 targetLiquidBps) external onlyOwner {
+        ITreasuryReserve(address(treasury)).rebalance(token, targetLiquidBps);
+        emit YieldRebalanceTriggered(token, targetLiquidBps);
     }
 
     // ─── UUPS ────────────────────────────────────────────────────────────────
