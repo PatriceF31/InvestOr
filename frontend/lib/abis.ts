@@ -4143,7 +4143,7 @@ export const ReserveABI = [
 ] as const;
 
 export const EventLoggerABI = [
-  {
+{
     "inputs": [],
     "stateMutability": "nonpayable",
     "type": "constructor"
@@ -4741,7 +4741,7 @@ export const EventLoggerABI = [
     "stateMutability": "payable",
     "type": "function"
   }
-] as const;
+]
 
 // ── LingotOr ──────────────────────────────────────────────
 // ── LingotOr ──────────────────────────────────────────────

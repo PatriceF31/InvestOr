@@ -427,11 +427,43 @@
       {
         "indexed": true,
         "internalType": "address",
+        "name": "newStrategy",
+        "type": "address"
+      }
+    ],
+    "name": "TreasuryYieldStrategyUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "implementation",
         "type": "address"
       }
     ],
     "name": "Upgraded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "targetLiquidBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "YieldRebalanceTriggered",
     "type": "event"
   },
   {
@@ -861,6 +893,24 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "targetLiquidBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "rebalanceYield",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
@@ -982,6 +1032,19 @@
       }
     ],
     "name": "setExchangeEurc",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newLogger",
+        "type": "address"
+      }
+    ],
+    "name": "setExchangeEventLogger",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1151,6 +1214,19 @@
       }
     ],
     "name": "setTellorOracle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newStrategy",
+        "type": "address"
+      }
+    ],
+    "name": "setTreasuryYieldStrategy",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

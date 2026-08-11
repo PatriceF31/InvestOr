@@ -36,7 +36,16 @@ interface ITreasury {
     function eurc() external view returns (address);
 }
 
-/// @title Exchange V4 — Achat/vente GLD contre USDC ou EURC avec conversion EUR/USD
+/// @dev Interface minimale vers EventLogger. Le paramètre `action` est typé
+///      uint8 ici (et non un enum local) car le sélecteur ABI d'un enum
+///      correspond à son type entier sous-jacent — EventLogger.ActionType
+///      tient sur uint8, donc les deux signatures matchent sans import croisé.
+///      Valeurs utilisées par Exchange : BUY = 2, SELL = 3 (cf. EventLogger.ActionType).
+interface IEventLogger {
+    function log(address user, uint8 action, uint256 amount, uint256 price) external;
+}
+
+/// @title Exchange V5 — Achat/vente GLD contre USDC ou EURC avec conversion EUR/USD
 /// @notice Multi-token : buy/sell acceptent USDC et EURC
 ///         Oracle EUR/USD Chainlink pour conversion correcte EURC→USD
 /// @dev UUPS upgradeable
@@ -49,6 +58,15 @@ interface ITreasury {
 ///   - previewSell/sell : applique conversion inverse USD→EUR si token = EURC
 ///   - getEurUsdRate() : vue publique du taux actuel
 ///   - __gap passe de [35] à [33]
+///
+/// Changements V5 vs V4 :
+///   - eventLogger (slot 17) : branchement vers EventLogger, absent jusqu'ici
+///     malgré ce qu'indiquait la doc d'architecture (Exchange n'appelait
+///     jamais log(), à l'origine du bug "historique vide")
+///   - setEventLogger() : setter owner, à appeler après upgrade
+///   - buy()/sell() : appellent eventLogger.log() via try/catch (un échec de
+///     logging — ex: source non autorisée — ne doit jamais bloquer un achat/vente)
+///   - __gap passe de [33] à [32]
 contract Exchange is
     Initializable,
     OwnableUpgradeable,
@@ -77,6 +95,7 @@ contract Exchange is
     // 14. feesBySlotV2      (V3)
     // 15. eurusdOracle      (V4) — Chainlink EUR/USD
     // 16. eurusdFallbackRate (V4) — taux fallback en 8 décimales
+    // 17. eventLogger       (V5) — historique on-chain (EventLogger)
     //
 
     IGLD      public gld;           // slot 0
@@ -104,6 +123,8 @@ contract Exchange is
     AggregatorV3Interface public eurusdOracle;   // slot 15 V4
     uint256 public eurusdFallbackRate;           // slot 16 V4 — ex: 108_000_000 = 1.08 (8 dec)
 
+    IEventLogger public eventLogger;             // slot 17 V5
+
     bytes32 public constant TELLOR_XAU_USD_QUERY_ID =
         0x5c13cd9c97dbb98f2429c101a2a8150e6c7a0ddaff6124ee176a3a411067ded0;
     uint256 public constant TELLOR_DECIMALS_FACTOR = 1e10;
@@ -126,6 +147,7 @@ contract Exchange is
     event CashbackClaimed(address indexed user, address indexed token, uint256 amount);
     event CashbackBpsUpdated(uint256 oldBps, uint256 newBps);
     event EurcUpdated(address indexed oldEurc, address indexed newEurc);
+    event EventLoggerUpdated(address indexed oldLogger, address indexed newLogger);
 
     // ─── Errors ──────────────────────────────────────────────────────────────
 
@@ -343,6 +365,11 @@ contract Exchange is
         }
 
         emit TokensBought(msg.sender, token, netAmount, gldAmount, price);
+
+        // Logging EventLogger (V5) — best-effort : ne doit jamais faire échouer un achat
+        if (address(eventLogger) != address(0)) {
+            try eventLogger.log(msg.sender, 2 /* BUY */, gldAmount, price) {} catch {}
+        }
     }
 
     // ─── Vente ───────────────────────────────────────────────────────────────
@@ -382,6 +409,11 @@ contract Exchange is
         treasury.operatorWithdraw(msg.sender, netStable, token);
 
         emit TokensSold(msg.sender, token, gldAmount, netStable, price);
+
+        // Logging EventLogger (V5) — best-effort : ne doit jamais faire échouer une vente
+        if (address(eventLogger) != address(0)) {
+            try eventLogger.log(msg.sender, 3 /* SELL */, gldAmount, price) {} catch {}
+        }
     }
 
     // ─── Admin ───────────────────────────────────────────────────────────────
@@ -399,6 +431,14 @@ contract Exchange is
         if (eurcAddress == address(0)) revert ZeroAddress();
         emit EurcUpdated(address(eurc), eurcAddress);
         eurc = IERC20(eurcAddress);
+    }
+
+    /// @notice Configure EventLogger. Doit être appelé après l'upgrade V5 —
+    ///         sinon eventLogger reste à address(0) et le logging est silencieusement
+    ///         désactivé (voir le if (address(eventLogger) != address(0)) dans buy()/sell()).
+    function setEventLogger(address newLogger) external onlyOwner {
+        emit EventLoggerUpdated(address(eventLogger), newLogger);
+        eventLogger = IEventLogger(newLogger);
     }
 
     function setFallbackPrice(uint256 newPrice) external onlyOwner {
@@ -559,7 +599,7 @@ contract Exchange is
 
     // ─── Storage gap ─────────────────────────────────────────────────────────
     //
-    // 17 slots explicites (0-16) + __gap[33] = 50 ✅
+    // 18 slots explicites (0-17) + __gap[32] = 50 ✅
 
-    uint256[33] private __gap;
+    uint256[32] private __gap;
 }

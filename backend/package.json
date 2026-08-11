@@ -1,6 +1,7 @@
 {
   "dependencies": {
-    "hardhat": "^3.2.0"
+    "hardhat": "^3.2.0",
+    "viem": "^2.55.13"
   },
   "type": "module",
   "devDependencies": {
@@ -28,6 +29,8 @@
   "scripts": {
     "compile": "hardhat compile && node scripts/generate-proxy-artifact.cjs",
     "compile:force": "hardhat compile --force && node scripts/generate-proxy-artifact.cjs",
+    "postcompile": "node scripts/sync-abis.mjs",
+    "postcompile:force": "node scripts/sync-abis.mjs",
     "test": "npm run compile && hardhat test",
     "test:gld": "npm run compile && hardhat test test/GLD.test.ts",
     "test:treasury": "npm run compile && hardhat test test/Treasury.test.ts",

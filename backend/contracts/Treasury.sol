@@ -11,7 +11,15 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./IYieldStrategy.sol";
 
-/// @title Treasury V3 — Gardien multi-token (USDC + EURC) + poche rendement
+/// @dev Interface minimale vers EventLogger — même logique que dans Exchange.sol :
+///      `action` en uint8 car un enum externe s'encode par son type entier
+///      sous-jacent au niveau du sélecteur ABI (EventLogger.ActionType tient sur uint8).
+///      Valeurs utilisées ici : DEPOSIT = 0, WITHDRAWAL = 1.
+interface IEventLogger {
+    function log(address user, uint8 action, uint256 amount, uint256 price) external;
+}
+
+/// @title Treasury V4 — Gardien multi-token (USDC + EURC) + poche rendement
 /// @notice Reçoit et restitue USDC et EURC pour le compte du protocole InvestOr
 /// @dev UUPS upgradeable — supporte plusieurs stablecoins (MiCA : USDC + EURC)
 ///
@@ -31,6 +39,17 @@ import "./IYieldStrategy.sol";
 ///     déclenché par Reserve (ou owner) — jamais automatique dans cette V1
 ///   - GLD ne transite JAMAIS par cette poche — uniquement USDC/EURC, aucun
 ///     conflit avec la couche de conformité ERC-3643 du token GLD
+///
+/// Nouveauté V4 — Branchement EventLogger :
+///   - eventLogger (slot 9) : absent jusqu'ici malgré la doc d'architecture
+///   - setEventLogger() : setter owner
+///   - deposit()/withdraw()/operatorWithdraw() loguent désormais DEPOSIT/WITHDRAWAL
+///     via try/catch (best-effort, ne bloque jamais un mouvement de fonds réel)
+///   - Nuance : pour deposit()/withdraw(), `user` = msg.sender = l'operator
+///     (typiquement Exchange), PAS le client final — Treasury ne connaît pas
+///     l'identité du client sur ces deux fonctions. operatorWithdraw() en
+///     revanche logue `user` = `to`, qui est bien le client final.
+///   - __gap passe de [41] à [40]
 contract Treasury is
     Initializable,
     OwnableUpgradeable,
@@ -51,6 +70,7 @@ contract Treasury is
     //  6. _totalDepositedByToken  (mapping) — V2
     //  7. _supportedTokens        (mapping) — V2
     //  8. yieldStrategy           (address) — V3, ajouté après tous les slots existants
+    //  9. eventLogger             (address) — V4
     //
 
     IERC20  public usdc;                               // slot 0
@@ -62,6 +82,7 @@ contract Treasury is
     mapping(address => uint256) private _totalDepositedByToken; // slot 6 V2
     mapping(address => bool)    private _supportedTokens;       // slot 7 V2
     IYieldStrategy public yieldStrategy;               // slot 8 V3
+    IEventLogger public eventLogger;                   // slot 9 V4
 
     // ─── Events ──────────────────────────────────────────────────────────────
 
@@ -76,6 +97,7 @@ contract Treasury is
     event YieldStrategyUpdated(address indexed oldStrategy, address indexed newStrategy);
     event Rebalanced(address indexed token, uint256 amount, bool depositedToStrategy);
     event YieldShortfallCovered(address indexed token, uint256 amountWithdrawn);
+    event EventLoggerUpdated(address indexed oldLogger, address indexed newLogger);
 
     // ─── Errors ──────────────────────────────────────────────────────────────
 
@@ -142,6 +164,12 @@ contract Treasury is
         _totalDepositedByToken[token] += amount;
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         emit Deposited(token, msg.sender, amount);
+
+        // Logging EventLogger (V4) — best-effort. Note : user = msg.sender = l'operator
+        // appelant (typiquement Exchange), pas forcément le client final.
+        if (address(eventLogger) != address(0)) {
+            try eventLogger.log(msg.sender, 0 /* DEPOSIT */, amount, 0) {} catch {}
+        }
     }
 
     function withdraw(uint256 amount, address token)
@@ -153,6 +181,12 @@ contract Treasury is
         _totalDepositedByToken[token] -= amount;
         IERC20(token).safeTransfer(msg.sender, amount);
         emit Withdrawn(token, msg.sender, amount);
+
+        // Logging EventLogger (V4) — best-effort. Même nuance que deposit() :
+        // user = msg.sender = l'operator appelant, pas forcément le client final.
+        if (address(eventLogger) != address(0)) {
+            try eventLogger.log(msg.sender, 1 /* WITHDRAWAL */, amount, 0) {} catch {}
+        }
     }
 
     function operatorWithdraw(address to, uint256 amount, address token)
@@ -181,6 +215,12 @@ contract Treasury is
         _totalDepositedByToken[token] -= amount;
         IERC20(token).safeTransfer(to, amount);
         emit OperatorWithdrawn(token, to, amount);
+
+        // Logging EventLogger (V4) — best-effort. Ici user = `to`, le vrai
+        // destinataire final (client qui vend son GLD, ou collecteur de fee).
+        if (address(eventLogger) != address(0)) {
+            try eventLogger.log(to, 1 /* WITHDRAWAL */, amount, 0) {} catch {}
+        }
     }
 
     function injectCapital(uint256 amount, address token)
@@ -250,6 +290,14 @@ contract Treasury is
         eurc = IERC20(eurcAddress);
         _supportedTokens[eurcAddress] = true;
         emit TokenAdded(eurcAddress);
+    }
+
+    /// @notice Configure EventLogger. Doit être appelé après l'upgrade V4 —
+    ///         sinon eventLogger reste à address(0) et le logging est silencieusement
+    ///         désactivé (voir les if (address(eventLogger) != address(0)) ci-dessus).
+    function setEventLogger(address newLogger) external onlyOwner {
+        emit EventLoggerUpdated(address(eventLogger), newLogger);
+        eventLogger = IEventLogger(newLogger);
     }
 
     function addSupportedToken(address token) external onlyOwner {
@@ -332,7 +380,7 @@ contract Treasury is
 
     // ─── Storage gap ─────────────────────────────────────────────────────────
     //
-    //  9 slots explicites (0-8) + __gap[41] = 50 ✅
+    // 10 slots explicites (0-9) + __gap[40] = 50 ✅
 
-    uint256[41] private __gap;
+    uint256[40] private __gap;
 }

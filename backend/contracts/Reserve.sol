@@ -64,6 +64,7 @@ interface IExchange {
     function setEurUsdOracle(address oracle) external;  // V4
     function setOracleMaxAge(uint256 newMaxAge) external;  // V4
     function setEurUsdFallbackRate(uint256 newRate) external;  // V4
+    function setEventLogger(address newLogger) external;  // V5
 }
 
 /// @dev Interface LingotOr pour le Proof of Reserve en mode grammes
@@ -71,9 +72,13 @@ interface ILingotOr {
     function totalGrammesEnCoffre() external view returns (uint256);
 }
 
-/// @title Reserve — Surveillance et Proof of Reserve du protocole InvestOr
+/// @title Reserve V3 — Surveillance et Proof of Reserve du protocole InvestOr
 /// @notice Vérifie que le Treasury USDC couvre les GLD en circulation au prix actuel
 /// @dev Prix via oracle multi-sources (Chainlink + Tellor) avec fallback Exchange
+///
+/// Nouveauté V3 : setExchangeEventLogger() — relais vers Exchange.setEventLogger()
+/// (V5), sur le même modèle que les autres setExchangeX(). Aucun nouveau slot de
+/// storage : uniquement une fonction ajoutée, __gap reste à [38].
 contract Reserve is
     Initializable,
     OwnableUpgradeable,
@@ -478,6 +483,11 @@ contract Reserve is
     /// @dev Ex: 116230500 = 1.1623 (8 décimales)
     function setExchangeEurUsdFallbackRate(uint256 newRate) external onlyOwner {
         IExchange(address(exchange)).setEurUsdFallbackRate(newRate);
+    }
+
+    /// @notice Configure EventLogger sur Exchange (V5) — relais, comme les autres setExchangeX
+    function setExchangeEventLogger(address newLogger) external onlyOwner {
+        IExchange(address(exchange)).setEventLogger(newLogger);
     }
 
     function addRecapitalizer(address account) external onlyOwner {
