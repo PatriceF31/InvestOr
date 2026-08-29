@@ -31,6 +31,18 @@ interface ITreasuryReserve {
 }
 
 /// @dev Interface Oracle Chainlink
+/// @dev Interface minimale vers LombardVault — définie localement, même convention
+///      que IExchange/ITreasuryReserve/IOracle ci-dessus
+interface ILombardVault {
+    function setOperator(address newOperator) external;
+    function setLtvParams(uint256 newLtvMaxBps, uint256 newLiquidationThresholdBps) external;
+    function setRateParams(uint256 newBorrowRateBps, uint256 newSupplierShareBps, uint256 newProtocolShareBps) external;
+    function setLiquidationDiscount(uint256 newDiscountBps) external;
+    function pause() external;
+    function unpause() external;
+    function claimProtocolShare(address to) external;
+}
+
 interface IOracle {
     function latestRoundData() external view returns (
         uint80, int256 answer, uint256, uint256 updatedAt, uint80
@@ -116,6 +128,9 @@ contract Reserve is
     /// @dev Oracle Tellor XAU/USD — slot 12 (nouveau)
     ITellorOracleReserve public tellorOracle;
 
+    /// @dev Prêt Lombard — slot 13 (nouveau)
+    address public lombardVault;
+
     // ─── Events ──────────────────────────────────────────────────────────────
 
     event ReserveChecked(
@@ -142,6 +157,14 @@ contract Reserve is
     event RecapitalizerAdded(address indexed account);
     event RecapitalizerRemoved(address indexed account);
     event LingotOrUpdated(address indexed oldAddr, address indexed newAddr);
+    event LombardVaultUpdated(address indexed oldVault, address indexed newVault);
+    event LombardOperatorUpdated(address indexed newOperator);
+    event LombardLtvParamsUpdated(uint256 ltvMaxBps, uint256 liquidationThresholdBps);
+    event LombardRateParamsUpdated(uint256 borrowRateBps, uint256 supplierShareBps, uint256 protocolShareBps);
+    event LombardLiquidationDiscountUpdated(uint256 discountBps);
+    event LombardPausedByReserve();
+    event LombardUnpausedByReserve();
+    event LombardProtocolShareClaimed(address indexed to);
     event TreasuryYieldStrategyUpdated(address indexed newStrategy);
     event YieldRebalanceTriggered(address indexed token, uint256 targetLiquidBps);
 
@@ -490,6 +513,66 @@ contract Reserve is
         IExchange(address(exchange)).setEventLogger(newLogger);
     }
 
+    // ─── Prêt Lombard (US-01, US-13) ────────────────────────────────────────
+
+    /// @notice Câblage initial (ou mise à jour) de l'adresse LombardVault
+    function setLombardVault(address newVault) external onlyOwner {
+        if (newVault == address(0)) revert ZeroAddress();
+        emit LombardVaultUpdated(lombardVault, newVault);
+        lombardVault = newVault;
+    }
+
+    /// @notice Change l'opérateur autorisé à déclencher liquidate() sur LombardVault
+    /// @dev L'opérateur reste une adresse dédiée (bot/backend), distincte de Reserve —
+    ///      une liquidation doit pouvoir s'exécuter sans attendre une signature 2/3 à
+    ///      chaque position à risque. Reserve ne fait que désigner qui a ce rôle.
+    function setLombardOperator(address newOperator) external onlyOwner {
+        if (lombardVault == address(0)) revert ZeroAddress();
+        ILombardVault(lombardVault).setOperator(newOperator);
+        emit LombardOperatorUpdated(newOperator);
+    }
+
+    function setLombardLtvParams(uint256 newLtvMaxBps, uint256 newLiquidationThresholdBps) external onlyOwner {
+        if (lombardVault == address(0)) revert ZeroAddress();
+        ILombardVault(lombardVault).setLtvParams(newLtvMaxBps, newLiquidationThresholdBps);
+        emit LombardLtvParamsUpdated(newLtvMaxBps, newLiquidationThresholdBps);
+    }
+
+    function setLombardRateParams(
+        uint256 newBorrowRateBps, uint256 newSupplierShareBps, uint256 newProtocolShareBps
+    ) external onlyOwner {
+        if (lombardVault == address(0)) revert ZeroAddress();
+        ILombardVault(lombardVault).setRateParams(newBorrowRateBps, newSupplierShareBps, newProtocolShareBps);
+        emit LombardRateParamsUpdated(newBorrowRateBps, newSupplierShareBps, newProtocolShareBps);
+    }
+
+    function setLombardLiquidationDiscount(uint256 newDiscountBps) external onlyOwner {
+        if (lombardVault == address(0)) revert ZeroAddress();
+        ILombardVault(lombardVault).setLiquidationDiscount(newDiscountBps);
+        emit LombardLiquidationDiscountUpdated(newDiscountBps);
+    }
+
+    /// @notice Coupure d'urgence du Lombard, orchestrée via Reserve/Safe
+    function pauseLombard() external onlyOwner {
+        if (lombardVault == address(0)) revert ZeroAddress();
+        ILombardVault(lombardVault).pause();
+        emit LombardPausedByReserve();
+    }
+
+    function unpauseLombard() external onlyOwner {
+        if (lombardVault == address(0)) revert ZeroAddress();
+        ILombardVault(lombardVault).unpause();
+        emit LombardUnpausedByReserve();
+    }
+
+    /// @notice Rapatrie la part protocole des intérêts du Lombard (spread InvestOr)
+    function claimLombardProtocolShare(address to) external onlyOwner {
+        if (lombardVault == address(0)) revert ZeroAddress();
+        if (to == address(0)) revert ZeroAddress();
+        ILombardVault(lombardVault).claimProtocolShare(to);
+        emit LombardProtocolShareClaimed(to);
+    }
+
     function addRecapitalizer(address account) external onlyOwner {
         if (account == address(0)) revert ZeroAddress();
         if (!recapitalizers[account]) {
@@ -559,8 +642,9 @@ contract Reserve is
     // 10. recapitalizerList  (array)
     // 11. lingotOr
     // 12. tellorOracle       ← nouveau slot V2
+    // 13. lombardVault       ← nouveau slot V3
     //
-    // 38 slots restants
+    // 37 slots restants
 
-    uint256[38] private __gap;
+    uint256[37] private __gap;
 }

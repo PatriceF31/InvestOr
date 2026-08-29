@@ -207,6 +207,120 @@
       {
         "indexed": false,
         "internalType": "uint256",
+        "name": "discountBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "LombardLiquidationDiscountUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "ltvMaxBps",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "liquidationThresholdBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "LombardLtvParamsUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOperator",
+        "type": "address"
+      }
+    ],
+    "name": "LombardOperatorUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [],
+    "name": "LombardPausedByReserve",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      }
+    ],
+    "name": "LombardProtocolShareClaimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "borrowRateBps",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "supplierShareBps",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "protocolShareBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "LombardRateParamsUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [],
+    "name": "LombardUnpausedByReserve",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "oldVault",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newVault",
+        "type": "address"
+      }
+    ],
+    "name": "LombardVaultUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
         "name": "oldRatio",
         "type": "uint256"
       },
@@ -573,6 +687,19 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      }
+    ],
+    "name": "claimLombardProtocolShare",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "exchange",
     "outputs": [
@@ -820,6 +947,19 @@
   },
   {
     "inputs": [],
+    "name": "lombardVault",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "minRatioBps",
     "outputs": [
       {
@@ -868,6 +1008,13 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "pauseLombard",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1170,6 +1317,86 @@
     "inputs": [
       {
         "internalType": "uint256",
+        "name": "newDiscountBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "setLombardLiquidationDiscount",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "newLtvMaxBps",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "newLiquidationThresholdBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "setLombardLtvParams",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOperator",
+        "type": "address"
+      }
+    ],
+    "name": "setLombardOperator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "newBorrowRateBps",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "newSupplierShareBps",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "newProtocolShareBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "setLombardRateParams",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newVault",
+        "type": "address"
+      }
+    ],
+    "name": "setLombardVault",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
         "name": "newRatioBps",
         "type": "uint256"
       }
@@ -1268,6 +1495,13 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "unpauseLombard",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

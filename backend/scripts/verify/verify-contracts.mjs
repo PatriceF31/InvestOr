@@ -70,7 +70,7 @@ const CONTRACTS = {
 
 // Slot standard EIP-1967 pour l'adresse d'implémentation d'un proxy UUPS/Transparent
 const EIP1967_IMPL_SLOT =
-  "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bb";
+  "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 async function getImplementation(address) {
   try {
@@ -119,6 +119,33 @@ async function main() {
       Implémentation: r.implementation ?? "-",
     }))
   );
+
+  // ── Branchement EventLogger sur Exchange / Treasury ───────────────────────
+  console.log("\n── Branchement EventLogger (Exchange / Treasury) ──\n");
+
+  const EVENT_LOGGER_GETTER_ABI = [
+    {
+      inputs: [],
+      name: "eventLogger",
+      outputs: [{ internalType: "address", name: "", type: "address" }],
+      stateMutability: "view",
+      type: "function",
+    },
+  ];
+
+  for (const name of ["Exchange", "Treasury"]) {
+    try {
+      const wired = await client.readContract({
+        address: CONTRACTS[name],
+        abi: EVENT_LOGGER_GETTER_ABI,
+        functionName: "eventLogger",
+      });
+      const ok = getAddress(wired) === getAddress(CONTRACTS.EventLogger);
+      console.log(`${name}.eventLogger() = ${wired}  ${ok ? "✅" : "❌ ne pointe pas vers EventLogger"}`);
+    } catch (e) {
+      console.log(`${name}.eventLogger() : erreur de lecture — ${e.shortMessage ?? e.message}`);
+    }
+  }
 
   // ── Diagnostic ciblé EventLogger ─────────────────────────────────────────
   console.log("\n── Diagnostic EventLogger ──\n");
