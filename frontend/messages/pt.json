@@ -13,7 +13,8 @@
     "global_stats": "Estatísticas globais",
     "grams_tokenized": "gramas tokenizados",
     "total_deposited": "Total depositado no Treasury",
-    "market_value": "Valor de mercado dos GLD"
+    "market_value": "Valor de mercado dos GLD",
+    "lombard": "Empréstimo Lombardo"
   },
 "dashboard": {
     "title": "Painel",
@@ -158,5 +159,15 @@
   },
   "lingots": {
     "ingot_manage":"Gestão dos lingotes"
-  }
+  },
+  "lombard": {
+	  "title": "Empréstimo Lombardo",
+	  "subtitle": "Peça USDC emprestado com GLD como colateral, ou torne-se financiador",
+	  "tab_borrow": "Pedir emprestado",
+	  "tab_lend": "Financiar",
+	  "status_healthy": "Posição saudável",
+	  "status_warning": "Próximo do limite",
+	  "status_danger": "Liquidável",
+	  "connect_hint": "Conecte a sua carteira para usar o Empréstimo Lombardo"
+	}
 }

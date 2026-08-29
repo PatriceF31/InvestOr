@@ -32,6 +32,7 @@ const CONTRACTS = [
   { file: "EventLogger.sol", name: "EventLogger", export: "EventLoggerABI" },
   { file: "GLD.sol", name: "GLD", export: "GLDABI" },
   { file: "LingotOr.sol", name: "LingotOr", export: "LingotOrABI" },
+  { file: "LombardVault.sol", name: "LombardVault", export: "LombardVaultABI" },
 ];
 
 function main() {

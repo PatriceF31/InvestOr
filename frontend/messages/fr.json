@@ -7,7 +7,8 @@
     "reserve": "Réserve",
     "admin": "Administration",
     "price": "Prix de l'or",
-    "ingot": "Lingot"
+    "ingot": "Lingot",
+    "lombard": "Prêt Lombard"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -152,5 +153,15 @@
   },
   "lingots": {
     "ingot_manage":"Gestion des lingots"
-  }
+  },
+  "lombard": {
+	"title": "Prêt Lombard",
+	"subtitle": "Empruntez de l'USDC contre votre GLD en collatéral, ou devenez prêteur",
+	"tab_borrow": "Emprunter",
+	"tab_lend": "Prêter",
+	"status_healthy": "Position saine",
+	"status_warning": "Proche du seuil",
+	"status_danger": "Liquidable",
+	"connect_hint": "Connectez votre portefeuille pour utiliser le Prêt Lombard"
+	}
 }

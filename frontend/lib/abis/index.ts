@@ -7,3 +7,4 @@ export { default as ReserveABI } from "./ReserveABI.json";
 export { default as EventLoggerABI } from "./EventLoggerABI.json";
 export { default as GLDABI } from "./GLDABI.json";
 export { default as LingotOrABI } from "./LingotOrABI.json";
+export { default as LombardVaultABI } from "./LombardVaultABI.json";

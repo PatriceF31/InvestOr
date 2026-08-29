@@ -1,6 +1,6 @@
 import { useChainId } from "wagmi";
 import { getAddresses } from "@/lib/addresses";
-import { GLDABI, TreasuryABI, ExchangeABI, ReserveABI, EventLoggerABI, LingotOrABI } from "@/lib/abis";
+import { GLDABI, TreasuryABI, ExchangeABI, ReserveABI, EventLoggerABI, LingotOrABI, LombardVaultABI } from "@/lib/abis";
 
 /**
  * Retourne les configs de contrats (address + abi) pour le réseau actif.
@@ -34,6 +34,10 @@ export function useContracts() {
     lingotOr: {
       address: addresses.LingotOr,
       abi: LingotOrABI,
+    },
+    lombardVault: {
+      address: addresses.LombardVault,
+      abi: LombardVaultABI,
     },
   };
 }
