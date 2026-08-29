@@ -7832,5 +7832,4 @@ export const LombardVaultABI = [
     "stateMutability": "nonpayable",
     "type": "function"
   }
-]
- as const;
+]as const;
